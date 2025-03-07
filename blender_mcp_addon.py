@@ -354,54 +354,87 @@ class BlenderMCPServer:
     
     def set_material(self, object_name, material_name=None, create_if_missing=True, color=None):
         """Set or create a material for an object"""
-        obj = bpy.data.objects.get(object_name)
-        if not obj:
-            raise ValueError(f"Object not found: {object_name}")
-        
-        # If material_name is provided, try to find or create the material
-        if material_name:
-            mat = bpy.data.materials.get(material_name)
-            if not mat and create_if_missing:
-                mat = bpy.data.materials.new(name=material_name)
-                
-                # Set material color if provided
-                if color and len(color) >= 3:
-                    mat.use_nodes = True
-                    bsdf = mat.node_tree.nodes.get('Principled BSDF')
-                    if bsdf:
-                        bsdf.inputs[0].default_value = (color[0], color[1], color[2], 1.0 if len(color) < 4 else color[3])
+        try:
+            # Get the object
+            obj = bpy.data.objects.get(object_name)
+            if not obj:
+                raise ValueError(f"Object not found: {object_name}")
             
-            # Assign material to object
-            if mat:
-                if obj.data.materials:
-                    obj.data.materials[0] = mat
-                else:
-                    obj.data.materials.append(mat)
+            # Make sure object can accept materials
+            if not hasattr(obj, 'data') or not hasattr(obj.data, 'materials'):
+                raise ValueError(f"Object {object_name} cannot accept materials")
             
-            return {"object": object_name, "material": material_name}
-        
-        # If only color is provided, create a new material with the color
-        elif color:
-            # Create a new material with auto-generated name
-            mat_name = f"{object_name}_material"
-            mat = bpy.data.materials.new(name=mat_name)
-            
-            # Set material color
-            mat.use_nodes = True
-            bsdf = mat.node_tree.nodes.get('Principled BSDF')
-            if bsdf:
-                bsdf.inputs[0].default_value = (color[0], color[1], color[2], 1.0 if len(color) < 4 else color[3])
-            
-            # Assign material to object
-            if obj.data.materials:
-                obj.data.materials[0] = mat
+            # Create or get material
+            if material_name:
+                mat = bpy.data.materials.get(material_name)
+                if not mat and create_if_missing:
+                    mat = bpy.data.materials.new(name=material_name)
+                    print(f"Created new material: {material_name}")
             else:
-                obj.data.materials.append(mat)
+                # Generate unique material name if none provided
+                mat_name = f"{object_name}_material"
+                mat = bpy.data.materials.get(mat_name)
+                if not mat:
+                    mat = bpy.data.materials.new(name=mat_name)
+                material_name = mat_name
+                print(f"Using material: {mat_name}")
             
-            return {"object": object_name, "material": mat_name}
-        
-        else:
-            return {"error": "Either material_name or color must be provided"}
+            # Set up material nodes if needed
+            if mat:
+                if not mat.use_nodes:
+                    mat.use_nodes = True
+                
+                # Get or create Principled BSDF
+                principled = mat.node_tree.nodes.get('Principled BSDF')
+                if not principled:
+                    principled = mat.node_tree.nodes.new('ShaderNodeBsdfPrincipled')
+                    # Get or create Material Output
+                    output = mat.node_tree.nodes.get('Material Output')
+                    if not output:
+                        output = mat.node_tree.nodes.new('ShaderNodeOutputMaterial')
+                    # Link if not already linked
+                    if not principled.outputs[0].links:
+                        mat.node_tree.links.new(principled.outputs[0], output.inputs[0])
+                
+                # Set color if provided
+                if color and len(color) >= 3:
+                    principled.inputs['Base Color'].default_value = (
+                        color[0],
+                        color[1],
+                        color[2],
+                        1.0 if len(color) < 4 else color[3]
+                    )
+                    print(f"Set material color to {color}")
+            
+            # Assign material to object if not already assigned
+            if mat:
+                if not obj.data.materials:
+                    obj.data.materials.append(mat)
+                else:
+                    # Only modify first material slot
+                    obj.data.materials[0] = mat
+                
+                print(f"Assigned material {mat.name} to object {object_name}")
+                
+                return {
+                    "status": "success",
+                    "object": object_name,
+                    "material": mat.name,
+                    "color": color if color else None
+                }
+            else:
+                raise ValueError(f"Failed to create or find material: {material_name}")
+            
+        except Exception as e:
+            print(f"Error in set_material: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "status": "error",
+                "message": str(e),
+                "object": object_name,
+                "material": material_name if 'material_name' in locals() else None
+            }
     
     def render_scene(self, output_path=None, resolution_x=None, resolution_y=None):
         """Render the current scene"""

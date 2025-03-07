@@ -474,44 +474,6 @@ def set_material(
         return f"Error setting material: {str(e)}"
 
 @mcp.tool()
-def render_scene(
-    ctx: Context,
-    output_path: str = None,
-    resolution_x: int = None,
-    resolution_y: int = None
-) -> str:
-    """
-    Render the current scene and return the image.
-    
-    Parameters:
-    - output_path: Optional path to save the rendered image
-    - resolution_x: Optional horizontal resolution
-    - resolution_y: Optional vertical resolution
-    """
-    try:
-        # Get the global connection
-        blender = get_blender_connection()
-        
-        params = {}
-        if output_path:
-            params["output_path"] = output_path
-        if resolution_x:
-            params["resolution_x"] = resolution_x
-        if resolution_y:
-            params["resolution_y"] = resolution_y
-            
-        result = blender.send_command("render_scene", params)
-        
-        if "image_path" in result:
-            # If we have an image path, we could potentially load and return the image
-            return f"Scene rendered to {result['image_path']}"
-        else:
-            return "Scene rendered successfully"
-    except Exception as e:
-        logger.error(f"Error rendering scene: {str(e)}")
-        return f"Error rendering scene: {str(e)}"
-
-@mcp.tool()
 def execute_blender_code(ctx: Context, code: str) -> str:
     """
     Execute arbitrary Python code in Blender.
