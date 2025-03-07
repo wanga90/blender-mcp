@@ -44,42 +44,62 @@ class BlenderConnection:
             finally:
                 self.sock = None
 
-    # Replace the single recv call with this chunked approach
     def receive_full_response(self, sock, buffer_size=8192):
         """Receive the complete response, potentially in multiple chunks"""
         chunks = []
-        sock.settimeout(10.0)
+        # Use a consistent timeout value that matches the addon's timeout
+        sock.settimeout(15.0)  # Match the addon's timeout
         
         try:
             while True:
-                chunk = sock.recv(buffer_size)
-                if not chunk:
-                    break
-                chunks.append(chunk)
-                
-                # Check if we've received a complete JSON object
                 try:
-                    data = b''.join(chunks)
-                    json.loads(data.decode('utf-8'))
-                    # If we get here, it parsed successfully
-                    logger.info(f"Received complete response ({len(data)} bytes)")
-                    return data
-                except json.JSONDecodeError:
-                    # Incomplete JSON, continue receiving
-                    continue
+                    chunk = sock.recv(buffer_size)
+                    if not chunk:
+                        # If we get an empty chunk, the connection might be closed
+                        if not chunks:  # If we haven't received anything yet, this is an error
+                            raise Exception("Connection closed before receiving any data")
+                        break
+                    
+                    chunks.append(chunk)
+                    
+                    # Check if we've received a complete JSON object
+                    try:
+                        data = b''.join(chunks)
+                        json.loads(data.decode('utf-8'))
+                        # If we get here, it parsed successfully
+                        logger.info(f"Received complete response ({len(data)} bytes)")
+                        return data
+                    except json.JSONDecodeError:
+                        # Incomplete JSON, continue receiving
+                        continue
+                except socket.timeout:
+                    # If we hit a timeout during receiving, break the loop and try to use what we have
+                    logger.warning("Socket timeout during chunked receive")
+                    break
+                except (ConnectionError, BrokenPipeError, ConnectionResetError) as e:
+                    logger.error(f"Socket connection error during receive: {str(e)}")
+                    raise  # Re-raise to be handled by the caller
         except socket.timeout:
             logger.warning("Socket timeout during chunked receive")
+        except Exception as e:
+            logger.error(f"Error during receive: {str(e)}")
+            raise
             
-        # Return whatever we got
-        data = b''.join(chunks)
-        if not data:
-            raise Exception("Empty response received")
-        return data
+        # If we get here, we either timed out or broke out of the loop
+        # Try to use what we have
+        if chunks:
+            data = b''.join(chunks)
+            logger.info(f"Returning data after receive completion ({len(data)} bytes)")
+            try:
+                # Try to parse what we have
+                json.loads(data.decode('utf-8'))
+                return data
+            except json.JSONDecodeError:
+                # If we can't parse it, it's incomplete
+                raise Exception("Incomplete JSON response received")
+        else:
+            raise Exception("No data received")
 
-# Then in send_command:
-# response_data = self.sock.recv(65536)
-
-    
     def send_command(self, command_type: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
         """Send a command to Blender and return the response"""
         if not self.sock and not self.connect():
@@ -98,11 +118,10 @@ class BlenderConnection:
             self.sock.sendall(json.dumps(command).encode('utf-8'))
             logger.info(f"Command sent, waiting for response...")
             
-            # Set a timeout for receiving
-            self.sock.settimeout(30.0)  # Increased timeout
+            # Set a timeout for receiving - use the same timeout as in receive_full_response
+            self.sock.settimeout(15.0)  # Match the addon's timeout
             
-            # Receive the response
-            # response_data = self.sock.recv(65536)  # Increase buffer size for larger responses
+            # Receive the response using the improved receive_full_response method
             response_data = self.receive_full_response(self.sock)
             logger.info(f"Received {len(response_data)} bytes of data")
             
@@ -116,42 +135,55 @@ class BlenderConnection:
             return response.get("result", {})
         except socket.timeout:
             logger.error("Socket timeout while waiting for response from Blender")
-            # Try to reconnect
-            self.disconnect()
-            if self.connect():
-                logger.info("Reconnected to Blender after timeout")
-            raise Exception("Timeout waiting for Blender response")
+            # Don't try to reconnect here - let the get_blender_connection handle reconnection
+            # Just invalidate the current socket so it will be recreated next time
+            self.sock = None
+            raise Exception("Timeout waiting for Blender response - try simplifying your request")
+        except (ConnectionError, BrokenPipeError, ConnectionResetError) as e:
+            logger.error(f"Socket connection error: {str(e)}")
+            self.sock = None
+            raise Exception(f"Connection to Blender lost: {str(e)}")
         except json.JSONDecodeError as e:
             logger.error(f"Invalid JSON response from Blender: {str(e)}")
             # Try to log what was received
-            if response_data:
+            if 'response_data' in locals() and response_data:
                 logger.error(f"Raw response (first 200 bytes): {response_data[:200]}")
             raise Exception(f"Invalid response from Blender: {str(e)}")
         except Exception as e:
             logger.error(f"Error communicating with Blender: {str(e)}")
-            # Try to reconnect
-            self.disconnect()
-            if self.connect():
-                logger.info("Reconnected to Blender")
+            # Don't try to reconnect here - let the get_blender_connection handle reconnection
+            self.sock = None
             raise Exception(f"Communication error with Blender: {str(e)}")
 
 @asynccontextmanager
 async def server_lifespan(server: FastMCP) -> AsyncIterator[Dict[str, Any]]:
     """Manage server startup and shutdown lifecycle"""
-    blender = BlenderConnection(host="localhost", port=9876)
+    # We don't need to create a connection here since we're using the global connection
+    # for resources and tools
     
     try:
-        # Connect to Blender on startup
-        connected = blender.connect()
-        if not connected:
-            logger.warning("Could not connect to Blender on startup. Make sure the Blender addon is running.")
+        # Just log that we're starting up
+        logger.info("BlenderMCP server starting up")
         
-        # Return the Blender connection in the context
-        yield {"blender": blender}
+        # Try to connect to Blender on startup to verify it's available
+        try:
+            # This will initialize the global connection if needed
+            blender = get_blender_connection()
+            logger.info("Successfully connected to Blender on startup")
+        except Exception as e:
+            logger.warning(f"Could not connect to Blender on startup: {str(e)}")
+            logger.warning("Make sure the Blender addon is running before using Blender resources or tools")
+        
+        # Return an empty context - we're using the global connection
+        yield {}
     finally:
-        # Disconnect from Blender on shutdown
-        blender.disconnect()
-        logger.info("Disconnected from Blender")
+        # Clean up the global connection on shutdown
+        global _blender_connection
+        if _blender_connection:
+            logger.info("Disconnecting from Blender on shutdown")
+            _blender_connection.disconnect()
+            _blender_connection = None
+        logger.info("BlenderMCP server shut down")
 
 # Create the MCP server with lifespan support
 mcp = FastMCP(
@@ -162,68 +194,88 @@ mcp = FastMCP(
 
 # Resource endpoints
 
-# Global connection for resources (workaround since resources can't access context)
+# Global connection for resources (since resources can't access context)
 _blender_connection = None
 
 def get_blender_connection():
+    """Get or create a persistent Blender connection"""
     global _blender_connection
+    
+    # If we have an existing connection, check if it's still valid
+    if _blender_connection is not None:
+        # Test if the connection is still alive with a simple ping
+        try:
+            # Just try to send a small message to check if the socket is still connected
+            _blender_connection.sock.sendall(b'')
+            return _blender_connection
+        except Exception as e:
+            # Connection is dead, close it and create a new one
+            logger.warning(f"Existing connection is no longer valid: {str(e)}")
+            try:
+                _blender_connection.disconnect()
+            except:
+                pass
+            _blender_connection = None
+    
+    # Create a new connection if needed
     if _blender_connection is None:
         _blender_connection = BlenderConnection(host="localhost", port=9876)
-        _blender_connection.connect()
+        if not _blender_connection.connect():
+            logger.error("Failed to connect to Blender")
+            _blender_connection = None
+            raise Exception("Could not connect to Blender. Make sure the Blender addon is running.")
+        logger.info("Created new persistent connection to Blender")
+    
     return _blender_connection
 
 @mcp.resource("blender://ping")
 def ping_blender() -> str:
-    """Simple ping to test Blender connectivity"""
-    blender = get_blender_connection()
-    
+    """Ping the Blender server to check connectivity"""
     try:
+        blender = get_blender_connection()
         result = blender.send_command("ping")
-        return f"Ping successful: {json.dumps(result)}"
+        return json.dumps({"status": "success", "result": result})
     except Exception as e:
-        return f"Ping failed: {str(e)}"
+        logger.error(f"Error pinging Blender: {str(e)}")
+        return json.dumps({"status": "error", "message": str(e)})
 
 @mcp.resource("blender://simple")
 def get_simple_info() -> str:
-    """Get simplified information from Blender"""
-    blender = get_blender_connection()
-    
+    """Get basic information about the Blender instance"""
     try:
+        blender = get_blender_connection()
         result = blender.send_command("get_simple_info")
-        return json.dumps(result, indent=2)
+        return json.dumps({"status": "success", "result": result})
     except Exception as e:
-        return f"Error getting simple info: {str(e)}"
+        logger.error(f"Error getting simple info from Blender: {str(e)}")
+        return json.dumps({"status": "error", "message": str(e)})
 
 @mcp.resource("blender://scene")
 def get_scene_info() -> str:
-    """
-    Get information about the current Blender scene, including all objects, 
-    materials, camera settings, and render configuration.
-    """
-    blender = get_blender_connection()
-    
+    """Get detailed information about the current Blender scene"""
     try:
-        scene_info = blender.send_command("get_scene_info")
-        return json.dumps(scene_info, indent=2)
+        blender = get_blender_connection()
+        result = blender.send_command("get_scene_info")
+        return json.dumps({"status": "success", "result": result})
     except Exception as e:
-        return f"Error getting scene info: {str(e)}"
-
+        logger.error(f"Error getting scene info from Blender: {str(e)}")
+        return json.dumps({"status": "error", "message": str(e)})
 
 @mcp.resource("blender://object/{object_name}")
 def get_object_info(object_name: str) -> str:
     """
     Get detailed information about a specific object in the Blender scene.
     
-    Parameters:
-    - object_name: The name of the object to get information about
+    Args:
+        object_name: The name of the object to get information about
     """
-    blender = get_blender_connection()
-    
     try:
-        object_info = blender.send_command("get_object_info", {"name": object_name})
-        return json.dumps(object_info, indent=2)
+        blender = get_blender_connection()
+        result = blender.send_command("get_object_info", {"name": object_name})
+        return json.dumps({"status": "success", "result": result})
     except Exception as e:
-        return f"Error getting object info: {str(e)}"
+        logger.error(f"Error getting object info from Blender: {str(e)}")
+        return json.dumps({"status": "error", "message": str(e)})
 
 # Tool endpoints
 
@@ -246,16 +298,15 @@ def create_object(
     - rotation: Optional [x, y, z] rotation in radians
     - scale: Optional [x, y, z] scale factors
     """
-    blender = ctx.request_context.lifespan_context.get("blender")
-    if not blender:
-        return "Not connected to Blender"
-    
-    # Set default values for missing parameters
-    loc = location or [0, 0, 0]
-    rot = rotation or [0, 0, 0]
-    sc = scale or [1, 1, 1]
-    
     try:
+        # Get the global connection
+        blender = get_blender_connection()
+        
+        # Set default values for missing parameters
+        loc = location or [0, 0, 0]
+        rot = rotation or [0, 0, 0]
+        sc = scale or [1, 1, 1]
+        
         params = {
             "type": type,
             "location": loc,
@@ -269,6 +320,7 @@ def create_object(
         result = blender.send_command("create_object", params)
         return f"Created {type} object: {result['name']}"
     except Exception as e:
+        logger.error(f"Error creating object: {str(e)}")
         return f"Error creating object: {str(e)}"
 
 @mcp.tool()
@@ -290,11 +342,10 @@ def modify_object(
     - scale: Optional [x, y, z] scale factors
     - visible: Optional boolean to set visibility
     """
-    blender = ctx.request_context.lifespan_context.get("blender")
-    if not blender:
-        return "Not connected to Blender"
-    
     try:
+        # Get the global connection
+        blender = get_blender_connection()
+        
         params = {"name": name}
         
         if location is not None:
@@ -309,6 +360,7 @@ def modify_object(
         result = blender.send_command("modify_object", params)
         return f"Modified object: {result['name']}"
     except Exception as e:
+        logger.error(f"Error modifying object: {str(e)}")
         return f"Error modifying object: {str(e)}"
 
 @mcp.tool()
@@ -319,14 +371,14 @@ def delete_object(ctx: Context, name: str) -> str:
     Parameters:
     - name: Name of the object to delete
     """
-    blender = ctx.request_context.lifespan_context.get("blender")
-    if not blender:
-        return "Not connected to Blender"
-    
     try:
+        # Get the global connection
+        blender = get_blender_connection()
+        
         result = blender.send_command("delete_object", {"name": name})
-        return f"Deleted object: {result['deleted']}"
+        return f"Deleted object: {name}"
     except Exception as e:
+        logger.error(f"Error deleting object: {str(e)}")
         return f"Error deleting object: {str(e)}"
 
 @mcp.tool()
@@ -340,32 +392,25 @@ def set_material(
     Set or create a material for an object.
     
     Parameters:
-    - object_name: Name of the object to assign the material to
-    - material_name: Optional name of the material to use/create
-    - color: Optional [r, g, b] or [r, g, b, a] color values (0.0-1.0)
+    - object_name: Name of the object to apply the material to
+    - material_name: Optional name of the material to use or create
+    - color: Optional [R, G, B] color values (0.0-1.0)
     """
-    blender = ctx.request_context.lifespan_context.get("blender")
-    if not blender:
-        return "Not connected to Blender"
-    
     try:
-        params = {
-            "object_name": object_name
-        }
+        # Get the global connection
+        blender = get_blender_connection()
+        
+        params = {"object_name": object_name}
         
         if material_name:
             params["material_name"] = material_name
-        
         if color:
             params["color"] = color
             
         result = blender.send_command("set_material", params)
-        
-        if "material" in result:
-            return f"Set material '{result['material']}' on object '{result['object']}'"
-        else:
-            return f"Error setting material: {result.get('error', 'Unknown error')}"
+        return f"Applied material to {object_name}: {result.get('material_name', 'unknown')}"
     except Exception as e:
+        logger.error(f"Error setting material: {str(e)}")
         return f"Error setting material: {str(e)}"
 
 @mcp.tool()
@@ -376,182 +421,148 @@ def render_scene(
     resolution_y: int = None
 ) -> str:
     """
-    Render the current Blender scene.
+    Render the current scene and return the image.
     
     Parameters:
     - output_path: Optional path to save the rendered image
-    - resolution_x: Optional horizontal resolution in pixels
-    - resolution_y: Optional vertical resolution in pixels
+    - resolution_x: Optional horizontal resolution
+    - resolution_y: Optional vertical resolution
     """
-    blender = ctx.request_context.lifespan_context.get("blender")
-    if not blender:
-        return "Not connected to Blender"
-    
     try:
-        params = {}
+        # Get the global connection
+        blender = get_blender_connection()
         
+        params = {}
         if output_path:
             params["output_path"] = output_path
-        
-        if resolution_x is not None:
+        if resolution_x:
             params["resolution_x"] = resolution_x
-            
-        if resolution_y is not None:
+        if resolution_y:
             params["resolution_y"] = resolution_y
             
         result = blender.send_command("render_scene", params)
         
-        if result.get("rendered"):
-            if output_path:
-                return f"Scene rendered and saved to {result['output_path']} at resolution {result['resolution'][0]}x{result['resolution'][1]}"
-            else:
-                return f"Scene rendered at resolution {result['resolution'][0]}x{result['resolution'][1]}"
+        if "image_path" in result:
+            # If we have an image path, we could potentially load and return the image
+            return f"Scene rendered to {result['image_path']}"
         else:
-            return "Error rendering scene"
+            return "Scene rendered successfully"
     except Exception as e:
+        logger.error(f"Error rendering scene: {str(e)}")
         return f"Error rendering scene: {str(e)}"
 
 @mcp.tool()
 def execute_blender_code(ctx: Context, code: str) -> str:
     """
-    Execute arbitrary Blender Python code.
-    
-    WARNING: This tool allows executing any Python code in Blender's environment.
-    Use with caution as it can modify or delete data.
+    Execute arbitrary Python code in Blender.
     
     Parameters:
-    - code: The Python code to execute in Blender's context
+    - code: The Python code to execute
     """
-    blender = ctx.request_context.lifespan_context.get("blender")
-    if not blender:
-        return "Not connected to Blender"
-    
     try:
-        result = blender.send_command("execute_code", {"code": code})
+        # Get the global connection
+        blender = get_blender_connection()
         
-        if result.get("executed"):
-            return "Code executed successfully"
-        else:
-            return "Error executing code"
+        result = blender.send_command("execute_code", {"code": code})
+        return f"Code executed successfully: {result.get('result', '')}"
     except Exception as e:
+        logger.error(f"Error executing code: {str(e)}")
         return f"Error executing code: {str(e)}"
 
 @mcp.tool()
 def create_3d_scene(ctx: Context, description: str) -> str:
     """
-    Create a 3D scene based on a natural language description.
-    This helper function interprets a description and creates the appropriate objects.
+    Create a 3D scene based on a text description.
+    
+    This is a higher-level tool that will interpret the description and create
+    appropriate objects, materials, and lighting.
     
     Parameters:
-    - description: A natural language description of the 3D scene to create
+    - description: Text description of the scene to create
     """
-    blender = ctx.request_context.lifespan_context.get("blender")
-    if not blender:
-        return "Not connected to Blender"
-    
-    # First, get the current scene to see what's there
     try:
-        scene_info = blender.send_command("get_scene_info")
-    except Exception as e:
-        return f"Error accessing Blender scene: {str(e)}"
-    
-    # Parse the description and create a simple scene
-    # This is a basic implementation - a more sophisticated version would use
-    # natural language understanding to interpret the description more accurately
-    
-    response = "Creating scene based on your description:\n\n"
-    
-    try:
-        # Split description into parts
-        parts = description.lower().split()
+        # Get the global connection
+        blender = get_blender_connection()
         
-        # Look for basic scene elements
-        if any(word in parts for word in ["ground", "floor", "plane"]):
-            # Create a ground plane
-            ground = blender.send_command("create_object", {
+        # Parse the description and create a scene
+        # This is a simplified implementation - in a real tool, you would use more
+        # sophisticated parsing and scene generation logic
+        
+        # For now, we'll just create a simple scene with a few objects
+        
+        # Clear existing objects (optional)
+        try:
+            blender.send_command("execute_code", {
+                "code": """
+import bpy
+# Delete all objects except camera and light
+for obj in bpy.data.objects:
+    if obj.type not in ['CAMERA', 'LIGHT']:
+        bpy.data.objects.remove(obj)
+"""
+            })
+        except Exception as e:
+            logger.warning(f"Error clearing scene: {str(e)}")
+        
+        # Create a simple scene based on the description
+        objects_created = []
+        
+        # Add a ground plane
+        try:
+            result = blender.send_command("create_object", {
                 "type": "PLANE",
                 "name": "Ground",
                 "location": [0, 0, 0],
                 "scale": [5, 5, 1]
             })
-            response += f"✓ Created ground plane '{ground['name']}'\n"
+            objects_created.append(result["name"])
             
-            # Set material to gray
+            # Set a material for the ground
             blender.send_command("set_material", {
-                "object_name": ground["name"],
+                "object_name": "Ground",
+                "material_name": "GroundMaterial",
                 "color": [0.8, 0.8, 0.8]
             })
+        except Exception as e:
+            logger.warning(f"Error creating ground: {str(e)}")
         
-        # Look for cubes
-        if any(word in parts for word in ["cube", "box"]):
-            cube = blender.send_command("create_object", {
-                "type": "CUBE",
-                "name": "Cube",
-                "location": [0, 0, 1],
-                "scale": [1, 1, 1]
-            })
-            response += f"✓ Created cube '{cube['name']}'\n"
-            
-            # Set material to blue
-            blender.send_command("set_material", {
-                "object_name": cube["name"],
-                "color": [0.2, 0.4, 0.8]
-            })
+        # Simple keyword-based object creation
+        if "cube" in description.lower():
+            try:
+                result = blender.send_command("create_object", {
+                    "type": "CUBE",
+                    "name": "Cube",
+                    "location": [0, 0, 1]
+                })
+                objects_created.append(result["name"])
+            except Exception as e:
+                logger.warning(f"Error creating cube: {str(e)}")
+                
+        if "sphere" in description.lower():
+            try:
+                result = blender.send_command("create_object", {
+                    "type": "SPHERE",
+                    "name": "Sphere",
+                    "location": [2, 0, 1]
+                })
+                objects_created.append(result["name"])
+            except Exception as e:
+                logger.warning(f"Error creating sphere: {str(e)}")
+                
+        if "cylinder" in description.lower():
+            try:
+                result = blender.send_command("create_object", {
+                    "type": "CYLINDER",
+                    "name": "Cylinder",
+                    "location": [-2, 0, 1]
+                })
+                objects_created.append(result["name"])
+            except Exception as e:
+                logger.warning(f"Error creating cylinder: {str(e)}")
         
-        # Look for spheres
-        if any(word in parts for word in ["sphere", "ball"]):
-            sphere = blender.send_command("create_object", {
-                "type": "SPHERE",
-                "name": "Sphere",
-                "location": [2, 2, 1],
-                "scale": [1, 1, 1]
-            })
-            response += f"✓ Created sphere '{sphere['name']}'\n"
-            
-            # Set material to red
-            blender.send_command("set_material", {
-                "object_name": sphere["name"],
-                "color": [0.8, 0.2, 0.2]
-            })
-        
-        # Look for cylinders
-        if any(word in parts for word in ["cylinder", "pipe", "tube"]):
-            cylinder = blender.send_command("create_object", {
-                "type": "CYLINDER",
-                "name": "Cylinder",
-                "location": [-2, -2, 1],
-                "scale": [1, 1, 1]
-            })
-            response += f"✓ Created cylinder '{cylinder['name']}'\n"
-            
-            # Set material to green
-            blender.send_command("set_material", {
-                "object_name": cylinder["name"],
-                "color": [0.2, 0.8, 0.2]
-            })
-        
-        # Add a camera if not already in the scene
-        if not any(obj.get("type") == "CAMERA" for obj in scene_info["objects"]):
-            camera = blender.send_command("create_object", {
-                "type": "CAMERA",
-                "name": "Camera",
-                "location": [7, -7, 5],
-                "rotation": [0.9, 0, 2.6]  # Pointing at the origin
-            })
-            response += f"✓ Added camera '{camera['name']}'\n"
-        
-        # Add a light if not already in the scene
-        if not any(obj.get("type") == "LIGHT" for obj in scene_info["objects"]):
-            light = blender.send_command("create_object", {
-                "type": "LIGHT",
-                "name": "Light",
-                "location": [4, 1, 6]
-            })
-            response += f"✓ Added light '{light['name']}'\n"
-        
-        response += "\nScene created! You can continue to modify it with specific commands."
-        return response
+        return f"Created scene with objects: {', '.join(objects_created)}"
     except Exception as e:
+        logger.error(f"Error creating scene: {str(e)}")
         return f"Error creating scene: {str(e)}"
 
 # Prompts to help users interact with Blender
@@ -582,8 +593,6 @@ def add_material() -> str:
     return """
 I have a cube in my scene. Can you create a blue metallic material and apply it to the cube?
 """
-
-
 
 # Main execution
 

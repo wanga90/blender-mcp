@@ -57,7 +57,7 @@ class BlenderMCPServer:
                         try:
                             # Set a timeout for receiving data
                             self.client.settimeout(15.0)
-                            data = self.client.recv(4096)
+                            data = self.client.recv(8192)  # Increased buffer size
                             if not data:
                                 print("Empty data received, client may have disconnected")
                                 break
@@ -65,9 +65,19 @@ class BlenderMCPServer:
                             try:
                                 print(f"Received data: {data.decode('utf-8')}")
                                 command = json.loads(data.decode('utf-8'))
+                                
+                                # Process the command
+                                print(f"Processing command: {command.get('type')}")
                                 response = self.execute_command(command)
-                                print(f"Sending response: {json.dumps(response)[:100]}...")  # Truncate long responses in log
-                                self.client.sendall(json.dumps(response).encode('utf-8'))
+                                
+                                # Send the response - handle large responses by chunking if needed
+                                response_json = json.dumps(response)
+                                print(f"Sending response: {response_json[:100]}...")  # Truncate long responses in log
+                                
+                                # Send in one go - most responses should be small enough
+                                self.client.sendall(response_json.encode('utf-8'))
+                                print("Response sent successfully")
+                                
                             except json.JSONDecodeError:
                                 print(f"Invalid JSON received: {data.decode('utf-8')}")
                                 self.client.sendall(json.dumps({
@@ -89,8 +99,9 @@ class BlenderMCPServer:
                             print(f"Error receiving data: {str(e)}")
                             break
                     
-                    self.client.close()
-                    self.client = None
+                    if self.client:
+                        self.client.close()
+                        self.client = None
                 except socket.timeout:
                     # This is normal - just continue the loop
                     continue
@@ -133,9 +144,14 @@ class BlenderMCPServer:
         handler = handlers.get(cmd_type)
         if handler:
             try:
+                print(f"Executing handler for {cmd_type}")
                 result = handler(**params)
+                print(f"Handler execution complete")
                 return {"status": "success", "result": result}
             except Exception as e:
+                print(f"Error in handler: {str(e)}")
+                import traceback
+                traceback.print_exc()
                 return {"status": "error", "message": str(e)}
         else:
             return {"status": "error", "message": f"Unknown command type: {cmd_type}"}
@@ -153,57 +169,30 @@ class BlenderMCPServer:
         """Get information about the current Blender scene"""
         try:
             print("Getting scene info...")
+            # Simplify the scene info to reduce data size
             scene_info = {
+                "name": bpy.context.scene.name,
+                "object_count": len(bpy.context.scene.objects),
                 "objects": [],
-                "materials": [],
-                "camera": {},
-                "render_settings": {},
+                "materials_count": len(bpy.data.materials),
             }
             
-            # Collect object information (limit to first 20 objects to prevent oversized responses)
+            # Collect minimal object information (limit to first 10 objects)
             for i, obj in enumerate(bpy.context.scene.objects):
-                if i >= 20:  # Limit to 20 objects to prevent oversized responses
+                if i >= 10:  # Reduced from 20 to 10
                     break
                     
                 obj_info = {
                     "name": obj.name,
                     "type": obj.type,
-                    "location": [float(obj.location.x), float(obj.location.y), float(obj.location.z)],
-                    "rotation": [float(obj.rotation_euler.x), float(obj.rotation_euler.y), float(obj.rotation_euler.z)],
-                    "scale": [float(obj.scale.x), float(obj.scale.y), float(obj.scale.z)],
-                    "visible": obj.visible_get(),
+                    # Only include basic location data
+                    "location": [round(float(obj.location.x), 2), 
+                                round(float(obj.location.y), 2), 
+                                round(float(obj.location.z), 2)],
                 }
                 scene_info["objects"].append(obj_info)
             
-            # Collect material information (limit to first 10 materials)
-            for i, mat in enumerate(bpy.data.materials):
-                if i >= 10:
-                    break
-                    
-                mat_info = {
-                    "name": mat.name,
-                    "use_nodes": bool(mat.use_nodes),
-                }
-                scene_info["materials"].append(mat_info)
-            
-            # Camera information
-            camera = bpy.context.scene.camera
-            if camera:
-                scene_info["camera"] = {
-                    "name": camera.name,
-                    "location": [float(camera.location.x), float(camera.location.y), float(camera.location.z)],
-                    "rotation": [float(camera.rotation_euler.x), float(camera.rotation_euler.y), float(camera.rotation_euler.z)],
-                }
-            
-            # Render settings (simplified)
-            render = bpy.context.scene.render
-            scene_info["render_settings"] = {
-                "engine": render.engine,
-                "resolution_x": int(render.resolution_x),
-                "resolution_y": int(render.resolution_y),
-            }
-            
-            print(f"Scene info collected: {len(scene_info['objects'])} objects, {len(scene_info['materials'])} materials")
+            print(f"Scene info collected: {len(scene_info['objects'])} objects")
             return scene_info
         except Exception as e:
             print(f"Error in get_scene_info: {str(e)}")
