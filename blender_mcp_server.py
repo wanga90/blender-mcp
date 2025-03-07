@@ -280,6 +280,66 @@ def get_object_info(object_name: str) -> str:
 # Tool endpoints
 
 @mcp.tool()
+def create_primitive(
+    ctx: Context,
+    type: str = "CUBE",
+    location: List[float] = None,
+    color: List[float] = None
+) -> str:
+    """
+    Create a basic primitive object in Blender.
+    
+    Parameters:
+    - type: Object type (CUBE, SPHERE, CYLINDER, PLANE)
+    - location: Optional [x, y, z] location coordinates
+    - color: Optional [R, G, B] color values (0.0-1.0)
+    """
+    try:
+        blender = get_blender_connection()
+        loc = location or [0, 0, 0]
+        
+        # First create the object
+        params = {
+            "type": type,
+            "location": loc
+        }
+        result = blender.send_command("create_object", params)
+        
+        # If color specified, set the material
+        if color:
+            blender.send_command("set_material", {
+                "object_name": result["name"],
+                "color": color
+            })
+            
+        return f"Created {type} at location {loc}"
+    except Exception as e:
+        return f"Error creating primitive: {str(e)}"
+
+@mcp.tool()
+def set_object_property(
+    ctx: Context,
+    name: str,
+    property: str,
+    value: Any
+) -> str:
+    """
+    Set a single property of an object.
+    
+    Parameters:
+    - name: Name of the object
+    - property: Property to set (location, rotation, scale, color, visible)
+    - value: New value for the property
+    """
+    try:
+        blender = get_blender_connection()
+        params = {"name": name, property: value}
+        result = blender.send_command("modify_object", params)
+        return f"Set {property} of {name} to {value}"
+    except Exception as e:
+        return f"Error setting property: {str(e)}"
+
+@mcp.tool()
 def create_object(
     ctx: Context,
     type: str = "CUBE",
@@ -469,130 +529,15 @@ def execute_blender_code(ctx: Context, code: str) -> str:
         logger.error(f"Error executing code: {str(e)}")
         return f"Error executing code: {str(e)}"
 
-@mcp.tool()
-def create_3d_scene(ctx: Context, description: str) -> str:
-    """
-    Create a 3D scene based on a text description.
-    
-    This is a higher-level tool that will interpret the description and create
-    appropriate objects, materials, and lighting.
-    
-    Parameters:
-    - description: Text description of the scene to create
-    """
-    try:
-        # Get the global connection
-        blender = get_blender_connection()
-        
-        # Parse the description and create a scene
-        # This is a simplified implementation - in a real tool, you would use more
-        # sophisticated parsing and scene generation logic
-        
-        # For now, we'll just create a simple scene with a few objects
-        
-        # Clear existing objects (optional)
-        try:
-            blender.send_command("execute_code", {
-                "code": """
-import bpy
-# Delete all objects except camera and light
-for obj in bpy.data.objects:
-    if obj.type not in ['CAMERA', 'LIGHT']:
-        bpy.data.objects.remove(obj)
-"""
-            })
-        except Exception as e:
-            logger.warning(f"Error clearing scene: {str(e)}")
-        
-        # Create a simple scene based on the description
-        objects_created = []
-        
-        # Add a ground plane
-        try:
-            result = blender.send_command("create_object", {
-                "type": "PLANE",
-                "name": "Ground",
-                "location": [0, 0, 0],
-                "scale": [5, 5, 1]
-            })
-            objects_created.append(result["name"])
-            
-            # Set a material for the ground
-            blender.send_command("set_material", {
-                "object_name": "Ground",
-                "material_name": "GroundMaterial",
-                "color": [0.8, 0.8, 0.8]
-            })
-        except Exception as e:
-            logger.warning(f"Error creating ground: {str(e)}")
-        
-        # Simple keyword-based object creation
-        if "cube" in description.lower():
-            try:
-                result = blender.send_command("create_object", {
-                    "type": "CUBE",
-                    "name": "Cube",
-                    "location": [0, 0, 1]
-                })
-                objects_created.append(result["name"])
-            except Exception as e:
-                logger.warning(f"Error creating cube: {str(e)}")
-                
-        if "sphere" in description.lower():
-            try:
-                result = blender.send_command("create_object", {
-                    "type": "SPHERE",
-                    "name": "Sphere",
-                    "location": [2, 0, 1]
-                })
-                objects_created.append(result["name"])
-            except Exception as e:
-                logger.warning(f"Error creating sphere: {str(e)}")
-                
-        if "cylinder" in description.lower():
-            try:
-                result = blender.send_command("create_object", {
-                    "type": "CYLINDER",
-                    "name": "Cylinder",
-                    "location": [-2, 0, 1]
-                })
-                objects_created.append(result["name"])
-            except Exception as e:
-                logger.warning(f"Error creating cylinder: {str(e)}")
-        
-        return f"Created scene with objects: {', '.join(objects_created)}"
-    except Exception as e:
-        logger.error(f"Error creating scene: {str(e)}")
-        return f"Error creating scene: {str(e)}"
-
-# Prompts to help users interact with Blender
+@mcp.prompt()
+def create_basic_object() -> str:
+    """Create a single object with basic properties"""
+    return """Create a blue cube at position [0, 1, 0]"""
 
 @mcp.prompt()
-def create_simple_scene() -> str:
-    """Create a simple Blender scene with basic objects"""
-    return """
-I'd like to create a simple scene in Blender. Please create:
-1. A ground plane
-2. A cube above the ground
-3. A sphere to the side
-4. Make sure there's a camera and light
-5. Set different colors for the objects
-"""
-
-@mcp.prompt()
-def animate_object() -> str:
-    """Create keyframe animation for an object"""
-    return """
-I want to animate a cube moving from point A to point B over 30 frames.
-Can you help me create this animation?
-"""
-
-@mcp.prompt()
-def add_material() -> str:
-    """Add a material to an object"""
-    return """
-I have a cube in my scene. Can you create a blue metallic material and apply it to the cube?
-"""
+def modify_basic_object() -> str:
+    """Modify a single property of an object"""
+    return """Make the cube red"""
 
 # Main execution
 

@@ -22,104 +22,124 @@ class BlenderMCPServer:
         self.running = False
         self.socket = None
         self.client = None
-        self.server_thread = None
+        self.command_queue = []
+        self.buffer = b''  # Add buffer for incomplete data
     
     def start(self):
         self.running = True
-        self.server_thread = threading.Thread(target=self._run_server)
-        self.server_thread.daemon = True
-        self.server_thread.start()
-        print(f"BlenderMCP server started on {self.host}:{self.port}")
-        
-    def stop(self):
-        self.running = False
-        if self.socket:
-            self.socket.close()
-        if self.client:
-            self.client.close()
-        print("BlenderMCP server stopped")
-    
-    def _run_server(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         
         try:
             self.socket.bind((self.host, self.port))
             self.socket.listen(1)
-            self.socket.settimeout(1.0)  # Add a timeout for accept
+            self.socket.setblocking(False)
+            # Register the timer
+            bpy.app.timers.register(self._process_server, persistent=True)
+            print(f"BlenderMCP server started on {self.host}:{self.port}")
+        except Exception as e:
+            print(f"Failed to start server: {str(e)}")
+            self.stop()
             
-            while self.running:
+    def stop(self):
+        self.running = False
+        if hasattr(bpy.app.timers, "unregister"):
+            if bpy.app.timers.is_registered(self._process_server):
+                bpy.app.timers.unregister(self._process_server)
+        if self.socket:
+            self.socket.close()
+        if self.client:
+            self.client.close()
+        self.socket = None
+        self.client = None
+        print("BlenderMCP server stopped")
+
+    def _process_server(self):
+        """Timer callback to process server operations"""
+        if not self.running:
+            return None  # Unregister timer
+            
+        try:
+            # Accept new connections
+            if not self.client and self.socket:
                 try:
                     self.client, address = self.socket.accept()
+                    self.client.setblocking(False)
                     print(f"Connected to client: {address}")
-                    
-                    while self.running:
-                        try:
-                            # Set a timeout for receiving data
-                            self.client.settimeout(15.0)
-                            data = self.client.recv(8192)  # Increased buffer size
-                            if not data:
-                                print("Empty data received, client may have disconnected")
-                                break
-                            
-                            try:
-                                print(f"Received data: {data.decode('utf-8')}")
-                                command = json.loads(data.decode('utf-8'))
-                                
-                                # Process the command
-                                print(f"Processing command: {command.get('type')}")
-                                response = self.execute_command(command)
-                                
-                                # Send the response - handle large responses by chunking if needed
-                                response_json = json.dumps(response)
-                                print(f"Sending response: {response_json[:100]}...")  # Truncate long responses in log
-                                
-                                # Send in one go - most responses should be small enough
-                                self.client.sendall(response_json.encode('utf-8'))
-                                print("Response sent successfully")
-                                
-                            except json.JSONDecodeError:
-                                print(f"Invalid JSON received: {data.decode('utf-8')}")
-                                self.client.sendall(json.dumps({
-                                    "status": "error",
-                                    "message": "Invalid JSON format"
-                                }).encode('utf-8'))
-                            except Exception as e:
-                                print(f"Error executing command: {str(e)}")
-                                import traceback
-                                traceback.print_exc()
-                                self.client.sendall(json.dumps({
-                                    "status": "error",
-                                    "message": str(e)
-                                }).encode('utf-8'))
-                        except socket.timeout:
-                            print("Socket timeout while waiting for data")
-                            continue
-                        except Exception as e:
-                            print(f"Error receiving data: {str(e)}")
-                            break
-                    
-                    if self.client:
-                        self.client.close()
-                        self.client = None
-                except socket.timeout:
-                    # This is normal - just continue the loop
-                    continue
+                except BlockingIOError:
+                    pass  # No connection waiting
                 except Exception as e:
-                    print(f"Connection error: {str(e)}")
+                    print(f"Error accepting connection: {str(e)}")
+                
+            # Process existing connection
+            if self.client:
+                try:
+                    # Try to receive data
+                    try:
+                        data = self.client.recv(8192)
+                        if data:
+                            self.buffer += data
+                            # Try to process complete messages
+                            try:
+                                # Attempt to parse the buffer as JSON
+                                command = json.loads(self.buffer.decode('utf-8'))
+                                # If successful, clear the buffer and process command
+                                self.buffer = b''
+                                response = self.execute_command(command)
+                                response_json = json.dumps(response)
+                                self.client.sendall(response_json.encode('utf-8'))
+                            except json.JSONDecodeError:
+                                # Incomplete data, keep in buffer
+                                pass
+                        else:
+                            # Connection closed by client
+                            print("Client disconnected")
+                            self.client.close()
+                            self.client = None
+                            self.buffer = b''
+                    except BlockingIOError:
+                        pass  # No data available
+                    except Exception as e:
+                        print(f"Error receiving data: {str(e)}")
+                        self.client.close()
+                        self.client = None
+                        self.buffer = b''
+                        
+                except Exception as e:
+                    print(f"Error with client: {str(e)}")
                     if self.client:
                         self.client.close()
                         self.client = None
-                    time.sleep(1)  # Prevent busy waiting
-        
+                    self.buffer = b''
+                    
         except Exception as e:
             print(f"Server error: {str(e)}")
-        finally:
-            if self.socket:
-                self.socket.close()
-    
+            
+        return 0.1  # Continue timer with 0.1 second interval
+
     def execute_command(self, command):
-        """Execute a Blender command received from the MCP server"""
+        """Execute a command in the main Blender thread"""
+        try:
+            cmd_type = command.get("type")
+            params = command.get("params", {})
+            
+            # Ensure we're in the right context
+            if cmd_type in ["create_object", "modify_object", "delete_object"]:
+                override = bpy.context.copy()
+                override['area'] = [area for area in bpy.context.screen.areas if area.type == 'VIEW_3D'][0]
+                with bpy.context.temp_override(**override):
+                    return self._execute_command_internal(command)
+            else:
+                return self._execute_command_internal(command)
+                
+        except Exception as e:
+            print(f"Error executing command: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return {"status": "error", "message": str(e)}
+
+    def _execute_command_internal(self, command):
+        """Internal command execution with proper context"""
         cmd_type = command.get("type")
         params = command.get("params", {})
 
