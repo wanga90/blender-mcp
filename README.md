@@ -48,8 +48,7 @@ Update your `claude_desktop_config.json` (located in `~/Library/Application\ Sup
         "blender": {
             "command": "uvx",
             "args": [
-                "blender-mcp",
-                "--stdio"
+                "blender-mcp"
             ]
         }
     }
@@ -70,6 +69,7 @@ This configuration allows Claude for Desktop to automatically start the Blender 
 ## Usage
 
 ### Starting the Connection
+![BlenderMCP in the sidebar](assets/addon-instructions.png)
 
 1. In Blender, go to the 3D View sidebar (press N if not visible)
 2. Find the "BlenderMCP" tab
