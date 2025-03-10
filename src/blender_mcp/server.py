@@ -229,32 +229,36 @@ def get_blender_connection():
     return _blender_connection
 
 
-@mcp.tool("blender://scene")
-def get_scene_info() -> str:
+@mcp.tool()
+def get_scene_info(ctx: Context) -> str:
     """Get detailed information about the current Blender scene"""
     try:
         blender = get_blender_connection()
         result = blender.send_command("get_scene_info")
-        return json.dumps({"status": "success", "result": result})
+        
+        # Just return the JSON representation of what Blender sent us
+        return json.dumps(result, indent=2)
     except Exception as e:
         logger.error(f"Error getting scene info from Blender: {str(e)}")
-        return json.dumps({"status": "error", "message": str(e)})
+        return f"Error getting scene info: {str(e)}"
 
-@mcp.tool("blender://object/{object_name}")
-def get_object_info(object_name: str) -> str:
+@mcp.tool()
+def get_object_info(ctx: Context, object_name: str) -> str:
     """
     Get detailed information about a specific object in the Blender scene.
     
-    Args:
-        object_name: The name of the object to get information about
+    Parameters:
+    - object_name: The name of the object to get information about
     """
     try:
         blender = get_blender_connection()
         result = blender.send_command("get_object_info", {"name": object_name})
-        return json.dumps({"status": "success", "result": result})
+        
+        # Just return the JSON representation of what Blender sent us
+        return json.dumps(result, indent=2)
     except Exception as e:
         logger.error(f"Error getting object info from Blender: {str(e)}")
-        return json.dumps({"status": "error", "message": str(e)})
+        return f"Error getting object info: {str(e)}"
 
 # Tool endpoints
 
