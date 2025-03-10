@@ -228,29 +228,8 @@ def get_blender_connection():
     
     return _blender_connection
 
-@mcp.resource("blender://ping")
-def ping_blender() -> str:
-    """Ping the Blender server to check connectivity"""
-    try:
-        blender = get_blender_connection()
-        result = blender.send_command("ping")
-        return json.dumps({"status": "success", "result": result})
-    except Exception as e:
-        logger.error(f"Error pinging Blender: {str(e)}")
-        return json.dumps({"status": "error", "message": str(e)})
 
-@mcp.resource("blender://simple")
-def get_simple_info() -> str:
-    """Get basic information about the Blender instance"""
-    try:
-        blender = get_blender_connection()
-        result = blender.send_command("get_simple_info")
-        return json.dumps({"status": "success", "result": result})
-    except Exception as e:
-        logger.error(f"Error getting simple info from Blender: {str(e)}")
-        return json.dumps({"status": "error", "message": str(e)})
-
-@mcp.resource("blender://scene")
+@mcp.tool("blender://scene")
 def get_scene_info() -> str:
     """Get detailed information about the current Blender scene"""
     try:
@@ -261,7 +240,7 @@ def get_scene_info() -> str:
         logger.error(f"Error getting scene info from Blender: {str(e)}")
         return json.dumps({"status": "error", "message": str(e)})
 
-@mcp.resource("blender://object/{object_name}")
+@mcp.tool("blender://object/{object_name}")
 def get_object_info(object_name: str) -> str:
     """
     Get detailed information about a specific object in the Blender scene.

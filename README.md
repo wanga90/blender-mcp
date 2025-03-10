@@ -9,7 +9,6 @@ BlenderMCP connects Blender to Claude AI through the Model Context Protocol (MCP
 - **Material control**: Apply and modify materials and colors
 - **Scene inspection**: Get detailed information about the current Blender scene
 - **Code execution**: Run arbitrary Python code in Blender from Claude
-- **Rendering**: Trigger renders directly from Claude
 
 ## Components
 
@@ -25,6 +24,40 @@ The system consists of two main components:
 - Blender 3.0 or newer
 - Python 3.7 or newer
 - MCP library (`pip install mcp`)
+
+### Quick Start
+
+Run blender-mcp without installing it permanently (pipx will automatically download and run the package):
+
+```bash
+pipx run blender-mcp
+```
+
+If you don't have pipx installed, you can install it with:
+
+```bash
+python -m pip install pipx
+```
+
+### Claude for Desktop Integration
+
+Update your `claude_desktop_config.json` (located in `~/Library/Application\ Support/Claude/claude_desktop_config.json` on macOS and `%APPDATA%/Claude/claude_desktop_config.json` on Windows) to include the following:
+
+```json
+{
+    "mcpServers": {
+        "blender": {
+            "command": "pipx",
+            "args": [
+                "run",
+                "blender-mcp"
+            ]
+        }
+    }
+}
+```
+
+This configuration allows Claude for Desktop to automatically start the Blender MCP server when needed. The pipx command will handle both downloading and running the package in one step.
 
 ### Installing the Blender Addon
 
