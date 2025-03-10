@@ -132,3 +132,9 @@ The `execute_blender_code` tool allows running arbitrary Python code in Blender,
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Install from Glama
+
+<a href="https://glama.ai/mcp/servers/1pugewd5pa">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/1pugewd5pa/badge" />
+</a>
