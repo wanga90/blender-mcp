@@ -27,16 +27,22 @@ The system consists of two main components:
 
 ### Quick Start
 
-Run blender-mcp without installing it permanently (pipx will automatically download and run the package):
+Run blender-mcp without installing it permanently (pipx or uvx will automatically download and run the package):
 
 ```bash
 pipx run blender-mcp
 ```
 
-If you don't have pipx installed, you can install it with:
+If you don't have p installed, you can run it with uv:
 
 ```bash
-python -m pip install pipx
+uvx run blender-mcp
+```
+
+
+If you don't have either, download uv:
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 ### Claude for Desktop Integration
@@ -47,10 +53,10 @@ Update your `claude_desktop_config.json` (located in `~/Library/Application\ Sup
 {
     "mcpServers": {
         "blender": {
-            "command": "pipx",
+            "command": "uvx",
             "args": [
-                "run",
-                "blender-mcp"
+                "blender-mcp",
+                "--stdio"
             ]
         }
     }
@@ -61,21 +67,12 @@ This configuration allows Claude for Desktop to automatically start the Blender 
 
 ### Installing the Blender Addon
 
+1. Download the `addon.py` file from this repo
 1. Open Blender
 2. Go to Edit > Preferences > Add-ons
-3. Click "Install..." and select the `blender_mcp_addon.py` file
+3. Click "Install..." and select the `addon.py` file
 4. Enable the addon by checking the box next to "Interface: Blender MCP"
 
-### Setting up the MCP Server
-
-1. Install the required Python packages:
-   ```
-   pip install mcp
-   ```
-2. Run the MCP server:
-   ```
-   python blender_mcp_server.py
-   ```
 
 ## Usage
 
@@ -91,32 +88,28 @@ This configuration allows Claude for Desktop to automatically start the Blender 
 
 Once connected, Claude can interact with Blender using the following capabilities:
 
-#### Resources
-
-- `blender://ping` - Check connectivity
-- `blender://simple` - Get basic Blender information
-- `blender://scene` - Get detailed scene information
-- `blender://object/{object_name}` - Get information about a specific object
-
 #### Tools
 
+- `get_scene_info` - Gets scene information
+- `get_object_info` - Gets detailed information for a specific object in the scene
 - `create_primitive` - Create basic primitive objects with optional color
 - `set_object_property` - Set a single property of an object
 - `create_object` - Create a new object with detailed parameters
 - `modify_object` - Modify an existing object's properties
 - `delete_object` - Remove an object from the scene
 - `set_material` - Apply or create materials for objects
-- `execute_blender_code` - Run arbitrary Python code in Blender
+- `execute_blender_code` - Run any Python code in Blender
 
 ### Example Commands
 
 Here are some examples of what you can ask Claude to do:
 
-- "Create a blue cube at position [0, 1, 0]"
-- "Make the cube red"
+- "Create a low poly scene in a dungeon, with a dragon guarding a pot of gold"
+- "Make the car red and metallic"
 - "Create a sphere and place it above the cube"
-- "Get information about the current scene"
-- "Delete the cube"
+- "Get information about the current scene, and make a threejs sketch from it"
+- "Make the lighting like a studio"
+- "Point the camera at the scene, and make it isometric"
 
 ## Troubleshooting
 
@@ -135,7 +128,7 @@ The system uses a simple JSON-based protocol over TCP sockets:
 
 ### Security Considerations
 
-The `execute_blender_code` tool allows running arbitrary Python code in Blender, which can be powerful but potentially dangerous. Use with caution in production environments.
+The `execute_blender_code` tool allows running arbitrary Python code in Blender, which can be powerful but potentially dangerous. Use with caution in production environments. ALWAYS save your work before using it.
 
 ## Limitations
 
@@ -146,7 +139,3 @@ The `execute_blender_code` tool allows running arbitrary Python code in Blender,
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-[Your license information here]
