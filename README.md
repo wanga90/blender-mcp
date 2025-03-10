@@ -14,33 +14,26 @@ BlenderMCP connects Blender to Claude AI through the Model Context Protocol (MCP
 
 The system consists of two main components:
 
-1. **Blender Addon (`blender_mcp_addon.py`)**: A Blender addon that creates a socket server within Blender to receive and execute commands
-2. **MCP Server (`blender_mcp_server.py`)**: A Python server that implements the Model Context Protocol and connects to the Blender addon
+1. **Blender Addon (`addon.py`)**: A Blender addon that creates a socket server within Blender to receive and execute commands
+2. **MCP Server (`src/blender_mcp/server.py`)**: A Python server that implements the Model Context Protocol and connects to the Blender addon
 
 ## Installation
 
 ### Prerequisites
 
 - Blender 3.0 or newer
-- Python 3.7 or newer
-- MCP library (`pip install mcp`)
+- Python 3.10 or newer
+
 
 ### Quick Start
 
 Run blender-mcp without installing it permanently (pipx or uvx will automatically download and run the package):
 
 ```bash
-pipx run blender-mcp
-```
-
-If you don't have p installed, you can run it with uv:
-
-```bash
 uvx run blender-mcp
 ```
 
-
-If you don't have either, download uv:
+If you don't have uvx, download uv:
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
