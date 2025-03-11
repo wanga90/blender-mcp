@@ -119,15 +119,11 @@ The system uses a simple JSON-based protocol over TCP sockets:
 - **Commands** are sent as JSON objects with a `type` and optional `params`
 - **Responses** are JSON objects with a `status` and `result` or `message`
 
-### Security Considerations
+## Limitations & Security Considerations
 
-The `execute_blender_code` tool allows running arbitrary Python code in Blender, which can be powerful but potentially dangerous. Use with caution in production environments. ALWAYS save your work before using it.
-
-## Limitations
-
-- The connection is local only (localhost)
-- Large data transfers may cause timeouts
+- The `execute_blender_code` tool allows running arbitrary Python code in Blender, which can be powerful but potentially dangerous. Use with caution in production environments. ALWAYS save your work before using it.
 - Complex operations might need to be broken down into smaller steps
+
 
 ## Contributing
 
