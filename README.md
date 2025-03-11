@@ -33,7 +33,11 @@ Run blender-mcp without installing it permanently (uvx will automatically downlo
 uvx blender-mcp
 ```
 
-If you don't have uvx, [download uv](https://docs.astral.sh/uv/getting-started/installation/)
+If you're on Mac, please install uv as
+```bash
+brew install uv
+```
+Otherwise installation instructions are on their website: [Install uv](https://docs.astral.sh/uv/getting-started/installation/)
 
 
 ### Claude for Desktop Integration
