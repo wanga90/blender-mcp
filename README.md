@@ -27,16 +27,14 @@ The system consists of two main components:
 
 ### Quick Start
 
-Run blender-mcp without installing it permanently (pipx or uvx will automatically download and run the package):
+Run blender-mcp without installing it permanently (uvx will automatically download and run the package):
 
 ```bash
-uvx run blender-mcp
+uvx blender-mcp
 ```
 
-If you don't have uvx, download uv:
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
+If you don't have uvx, [download uv](https://docs.astral.sh/uv/getting-started/installation/)
+
 
 ### Claude for Desktop Integration
 
