@@ -129,3 +129,7 @@ The system uses a simple JSON-based protocol over TCP sockets:
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Disclaimer
+
+This is a third-party integration and not made by Blender.
