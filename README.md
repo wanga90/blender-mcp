@@ -97,9 +97,9 @@ Once connected, Claude can interact with Blender using the following capabilitie
 
 Here are some examples of what you can ask Claude to do:
 
-- "Create a low poly scene in a dungeon, with a dragon guarding a pot of gold" [Demo](https://www.youtube.com/watch?v=wiHcLcFBbKU)
-- Give a reference image, and create a Blender scene out of it [Demo](https://www.youtube.com/watch?v=nKSA3bmzfms)
-- "Get information about the current scene, and make a threejs sketch from it" [Demo](https://www.youtube.com/watch?v=dKrWs4oJuKA)
+- "Create a low poly scene in a dungeon, with a dragon guarding a pot of gold" [Demo](https://www.youtube.com/watch?v=DqgKuLYUv00)
+- Give a reference image, and create a Blender scene out of it [Demo](https://www.youtube.com/watch?v=FDRb03XPiRo)
+- "Get information about the current scene, and make a threejs sketch from it" [Demo](https://www.youtube.com/watch?v=jxbNI5L7AH8)
 - "Make this car red and metallic" 
 - "Create a sphere and place it above the cube"
 - "Make the lighting like a studio"
