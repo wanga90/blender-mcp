@@ -51,7 +51,7 @@ Update your `claude_desktop_config.json` (located in `~/Library/Application\ Sup
 
 ### Cursor integration
 
-Run blender-mcp without installing it permanently (uvx will automatically download and run the package):
+Run blender-mcp without installing it permanently through uvx. Go to Cursor Settings > MCP and paste this as a command.
 
 ```bash
 uvx blender-mcp
