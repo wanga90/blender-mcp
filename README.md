@@ -19,6 +19,8 @@ The system consists of two main components:
 
 ## Installation
 
+[Watch the installation follow-along video](https://www.youtube.com/watch?v=neoK_WMq92g)
+
 ### Prerequisites
 
 - Blender 3.0 or newer
