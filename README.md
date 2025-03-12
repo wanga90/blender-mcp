@@ -32,7 +32,7 @@ brew install uv
 ```
 Otherwise installation instructions are on their website: [Install uv](https://docs.astral.sh/uv/getting-started/installation/)
 
-DO NOT PROCEED BEFORE INSTALLING UV
+**Do not proceed before installing UV**
 
 
 ### Claude for Desktop Integration
@@ -61,6 +61,8 @@ Run blender-mcp without installing it permanently through uvx. Go to Cursor Sett
 ```bash
 uvx blender-mcp
 ```
+
+**Only run one instance of the MCP server (either on Cursor or Claude Desktop), not both**
 
 ### Installing the Blender Addon
 
