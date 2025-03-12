@@ -109,9 +109,9 @@ Here are some examples of what you can ask Claude to do:
 
 ## Troubleshooting
 
-- **Connection issues**: Make sure both the Blender addon server and the MCP server are running
-- **Command failures**: Check the console in Blender for error messages
+- **Connection issues**: Make sure the Blender addon server is running, and the MCP server is configured on Claude, DO NOT run the uvx command in the terminal
 - **Timeout errors**: Try simplifying your requests or breaking them into smaller steps
+- **Have you tried turning it off and on again?**: If you're still having connection errors, try restarting both Claude and the Blender server
 
 ## Technical Details
 
