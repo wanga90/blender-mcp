@@ -23,15 +23,7 @@ The system consists of two main components:
 
 - Blender 3.0 or newer
 - Python 3.10 or newer
-
-
-### Quick Start
-
-Run blender-mcp without installing it permanently (uvx will automatically download and run the package):
-
-```bash
-uvx blender-mcp
-```
+- uv package manager: 
 
 If you're on Mac, please install uv as
 ```bash
@@ -57,7 +49,13 @@ Update your `claude_desktop_config.json` (located in `~/Library/Application\ Sup
 }
 ```
 
-This configuration allows Claude for Desktop to automatically start the Blender MCP server when needed. The pipx command will handle both downloading and running the package in one step.
+### Cursor integration
+
+Run blender-mcp without installing it permanently (uvx will automatically download and run the package):
+
+```bash
+uvx blender-mcp
+```
 
 ### Installing the Blender Addon
 
