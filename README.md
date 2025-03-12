@@ -19,7 +19,6 @@ The system consists of two main components:
 
 ## Installation
 
-[Watch the installation follow-along video](https://www.youtube.com/watch?v=neoK_WMq92g)
 
 ### Prerequisites
 
@@ -33,8 +32,12 @@ brew install uv
 ```
 Otherwise installation instructions are on their website: [Install uv](https://docs.astral.sh/uv/getting-started/installation/)
 
+DO NOT PROCEED BEFORE INSTALLING UV
+
 
 ### Claude for Desktop Integration
+
+[Watch the setup instruction video](https://www.youtube.com/watch?v=neoK_WMq92g) (Assuming you have already installed uv)
 
 Go to Claude > Settings > Developer > Edit Config to include the following:
 
