@@ -79,7 +79,9 @@ uvx blender-mcp
 
 ### Using with Claude
 
-Once connected, Claude can interact with Blender using the following capabilities:
+Once the config file has been set on Claude, and the addon is running on Blender, you will see a hammer icon with tools for the Blender MCP.
+
+![BlenderMCP in the sidebar](assets/hammer-icon.png)
 
 #### Tools
 
