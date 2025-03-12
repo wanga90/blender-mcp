@@ -34,7 +34,7 @@ Otherwise installation instructions are on their website: [Install uv](https://d
 
 ### Claude for Desktop Integration
 
-Update your `claude_desktop_config.json` (located in `~/Library/Application\ Support/Claude/claude_desktop_config.json` on macOS and `%APPDATA%/Claude/claude_desktop_config.json` on Windows) to include the following:
+Go to Claude > Settings > Developer > Edit Config to include the following:
 
 ```json
 {
