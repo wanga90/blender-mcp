@@ -263,41 +263,7 @@ def get_object_info(ctx: Context, object_name: str) -> str:
 # Tool endpoints
 
 @mcp.tool()
-def create_primitive(
-    ctx: Context,
-    type: str = "CUBE",
-    location: List[float] = None,
-    color: List[float] = None
-) -> str:
-    """
-    Create a basic primitive object in Blender.
-    
-    Parameters:
-    - type: Object type (CUBE, SPHERE, CYLINDER, PLANE)
-    - location: Optional [x, y, z] location coordinates
-    - color: Optional [R, G, B] color values (0.0-1.0)
-    """
-    try:
-        blender = get_blender_connection()
-        loc = location or [0, 0, 0]
-        
-        # First create the object
-        params = {
-            "type": type,
-            "location": loc
-        }
-        result = blender.send_command("create_object", params)
-        
-        # If color specified, set the material
-        if color:
-            blender.send_command("set_material", {
-                "object_name": result["name"],
-                "color": color
-            })
-            
-        return f"Created {type} at location {loc}"
-    except Exception as e:
-        return f"Error creating primitive: {str(e)}"
+
 
 @mcp.tool()
 def set_object_property(
@@ -474,15 +440,137 @@ def execute_blender_code(ctx: Context, code: str) -> str:
         logger.error(f"Error executing code: {str(e)}")
         return f"Error executing code: {str(e)}"
 
-@mcp.prompt()
-def create_basic_object() -> str:
-    """Create a single object with basic properties"""
-    return """Create a blue cube at position [0, 1, 0]"""
+@mcp.tool()
+def get_polyhaven_categories(ctx: Context, asset_type: str = "hdris") -> str:
+    """
+    Get a list of categories for a specific asset type on Polyhaven.
+    
+    Parameters:
+    - asset_type: The type of asset to get categories for (hdris, textures, models, all)
+    
+    Returns a list of categories with the count of assets in each category.
+    """
+    try:
+        blender = get_blender_connection()
+        result = blender.send_command("get_polyhaven_categories", {"asset_type": asset_type})
+        
+        if "error" in result:
+            return f"Error: {result['error']}"
+        
+        # Format the categories in a more readable way
+        categories = result["categories"]
+        formatted_output = f"Categories for {asset_type}:\n\n"
+        
+        # Sort categories by count (descending)
+        sorted_categories = sorted(categories.items(), key=lambda x: x[1], reverse=True)
+        
+        for category, count in sorted_categories:
+            formatted_output += f"- {category}: {count} assets\n"
+        
+        return formatted_output
+    except Exception as e:
+        logger.error(f"Error getting Polyhaven categories: {str(e)}")
+        return f"Error getting Polyhaven categories: {str(e)}"
 
-@mcp.prompt()
-def modify_basic_object() -> str:
-    """Modify a single property of an object"""
-    return """Make the cube red"""
+@mcp.tool()
+def search_polyhaven_assets(
+    ctx: Context,
+    asset_type: str = "all",
+    categories: str = None
+) -> str:
+    """
+    Search for assets on Polyhaven with optional filtering.
+    
+    Parameters:
+    - asset_type: Type of assets to search for (hdris, textures, models, all)
+    - categories: Optional comma-separated list of categories to filter by
+    
+    Returns a list of matching assets with basic information.
+    """
+    try:
+        blender = get_blender_connection()
+        result = blender.send_command("search_polyhaven_assets", {
+            "asset_type": asset_type,
+            "categories": categories
+        })
+        
+        if "error" in result:
+            return f"Error: {result['error']}"
+        
+        # Format the assets in a more readable way
+        assets = result["assets"]
+        total_count = result["total_count"]
+        returned_count = result["returned_count"]
+        
+        formatted_output = f"Found {total_count} assets"
+        if categories:
+            formatted_output += f" in categories: {categories}"
+        formatted_output += f"\nShowing {returned_count} assets:\n\n"
+        
+        # Sort assets by download count (popularity)
+        sorted_assets = sorted(assets.items(), key=lambda x: x[1].get("download_count", 0), reverse=True)
+        
+        for asset_id, asset_data in sorted_assets:
+            formatted_output += f"- {asset_data.get('name', asset_id)} (ID: {asset_id})\n"
+            formatted_output += f"  Type: {['HDRI', 'Texture', 'Model'][asset_data.get('type', 0)]}\n"
+            formatted_output += f"  Categories: {', '.join(asset_data.get('categories', []))}\n"
+            formatted_output += f"  Downloads: {asset_data.get('download_count', 'Unknown')}\n\n"
+        
+        return formatted_output
+    except Exception as e:
+        logger.error(f"Error searching Polyhaven assets: {str(e)}")
+        return f"Error searching Polyhaven assets: {str(e)}"
+
+@mcp.tool()
+def download_polyhaven_asset(
+    ctx: Context,
+    asset_id: str,
+    asset_type: str,
+    resolution: str = "1k",
+    file_format: str = None
+) -> str:
+    """
+    Download and import a Polyhaven asset into Blender.
+    
+    Parameters:
+    - asset_id: The ID of the asset to download
+    - asset_type: The type of asset (hdris, textures, models)
+    - resolution: The resolution to download (e.g., 1k, 2k, 4k)
+    - file_format: Optional file format (e.g., hdr, exr for HDRIs; jpg, png for textures; gltf, fbx for models)
+    
+    Returns a message indicating success or failure.
+    """
+    try:
+        blender = get_blender_connection()
+        result = blender.send_command("download_polyhaven_asset", {
+            "asset_id": asset_id,
+            "asset_type": asset_type,
+            "resolution": resolution,
+            "file_format": file_format
+        })
+        
+        if "error" in result:
+            return f"Error: {result['error']}"
+        
+        if result.get("success"):
+            message = result.get("message", "Asset downloaded and imported successfully")
+            
+            # Add additional information based on asset type
+            if asset_type == "hdris":
+                return f"{message}. The HDRI has been set as the world environment."
+            elif asset_type == "textures":
+                material_name = result.get("material", "")
+                maps = ", ".join(result.get("maps", []))
+                return f"{message}. Created material '{material_name}' with maps: {maps}."
+            elif asset_type == "models":
+                return f"{message}. The model has been imported into the current scene."
+            else:
+                return message
+        else:
+            return f"Failed to download asset: {result.get('message', 'Unknown error')}"
+    except Exception as e:
+        logger.error(f"Error downloading Polyhaven asset: {str(e)}")
+        return f"Error downloading Polyhaven asset: {str(e)}"
 
 # Main execution
 
