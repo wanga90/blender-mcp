@@ -39,7 +39,7 @@ Otherwise installation instructions are on their website: [Install uv](https://d
 
 [Watch the setup instruction video](https://www.youtube.com/watch?v=neoK_WMq92g) (Assuming you have already installed uv)
 
-Go to Claude > Settings > Developer > Edit Config to include the following:
+Go to Claude > Settings > Developer > Edit Config > claude_desktop_config.json to include the following:
 
 ```json
 {
