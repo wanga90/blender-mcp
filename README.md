@@ -105,6 +105,8 @@ Once the config file has been set on Claude, and the addon is running on Blender
 - `search_polyhaven_assets` - Search for assets on PolyHaven with optional category filtering
 - `download_polyhaven_asset` - Download and import a PolyHaven asset into Blender
 
+To see everything in Poly Haven, [see here](https://polyhaven.com/)
+
 ### Example Commands
 
 Here are some examples of what you can ask Claude to do:
