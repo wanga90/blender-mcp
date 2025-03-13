@@ -30,6 +30,11 @@ If you're on Mac, please install uv as
 ```bash
 brew install uv
 ```
+On Windows
+```bash
+pip install uv
+```
+
 Otherwise installation instructions are on their website: [Install uv](https://docs.astral.sh/uv/getting-started/installation/)
 
 **⚠️ Do not proceed before installing UV**
