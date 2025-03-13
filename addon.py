@@ -687,6 +687,7 @@ class BlenderMCPServer:
                     
                     mapping = nodes.new(type='ShaderNodeMapping')
                     mapping.location = (-600, 0)
+                    mapping.vector_type = 'TEXTURE'  # Changed from default 'POINT' to 'TEXTURE'
                     links.new(tex_coord.outputs['UV'], mapping.inputs['Vector'])
                     
                     # Position offset for texture nodes
@@ -915,8 +916,7 @@ class BlenderMCPServer:
             
             mapping = nodes.new(type='ShaderNodeMapping')
             mapping.location = (-600, 0)
-            # Set a smaller scale to make the texture more visible
-            mapping.inputs['Scale'].default_value = (0.5, 0.5, 0.5)
+            mapping.vector_type = 'TEXTURE'  # Changed from default 'POINT' to 'TEXTURE'
             links.new(tex_coord.outputs['UV'], mapping.inputs['Vector'])
             
             # Position offset for texture nodes
