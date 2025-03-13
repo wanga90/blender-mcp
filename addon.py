@@ -148,14 +148,12 @@ class BlenderMCPServer:
         cmd_type = command.get("type")
         params = command.get("params", {})
 
-        # Add a simple ping handler
-        if cmd_type == "ping":
-            print("Handling ping command")
-            return {"status": "success", "result": {"pong": True}}
+        # Add a handler for checking PolyHaven status
+        if cmd_type == "get_polyhaven_status":
+            return {"status": "success", "result": self.get_polyhaven_status()}
         
+        # Base handlers that are always available
         handlers = {
-            "ping": lambda **kwargs: {"pong": True},
-            "get_simple_info": self.get_simple_info,
             "get_scene_info": self.get_scene_info,
             "create_object": self.create_object,
             "modify_object": self.modify_object,
@@ -163,13 +161,18 @@ class BlenderMCPServer:
             "get_object_info": self.get_object_info,
             "execute_code": self.execute_code,
             "set_material": self.set_material,
-            "render_scene": self.render_scene,
-            # Add Polyhaven handlers
-            "get_polyhaven_categories": self.get_polyhaven_categories,
-            "search_polyhaven_assets": self.search_polyhaven_assets,
-            "download_polyhaven_asset": self.download_polyhaven_asset,
-            "set_texture": self.set_texture, 
+            "get_polyhaven_status": self.get_polyhaven_status,
         }
+        
+        # Add Polyhaven handlers only if enabled
+        if bpy.context.scene.blendermcp_use_polyhaven:
+            polyhaven_handlers = {
+                "get_polyhaven_categories": self.get_polyhaven_categories,
+                "search_polyhaven_assets": self.search_polyhaven_assets,
+                "download_polyhaven_asset": self.download_polyhaven_asset,
+                "set_texture": self.set_texture,
+            }
+            handlers.update(polyhaven_handlers)
         
         handler = handlers.get(cmd_type)
         if handler:
@@ -1137,7 +1140,20 @@ class BlenderMCPServer:
             traceback.print_exc()
             return {"error": f"Failed to apply texture: {str(e)}"}
 
-    
+    def get_polyhaven_status(self):
+        """Get the current status of PolyHaven integration"""
+        enabled = bpy.context.scene.blendermcp_use_polyhaven
+        if enabled:
+            return {"enabled": True, "message": "PolyHaven integration is enabled and ready to use."}
+        else:
+            return {
+                "enabled": False, 
+                "message": """PolyHaven integration is currently disabled. To enable it:
+                            1. In the 3D Viewport, find the BlenderMCP panel in the sidebar (press N if hidden)
+                            2. Check the 'Use assets from Poly Haven' checkbox
+                            3. Restart the connection to Claude"""
+        }
+
 # Blender UI Panel
 class BLENDERMCP_PT_Panel(bpy.types.Panel):
     bl_label = "Blender MCP"
@@ -1151,6 +1167,7 @@ class BLENDERMCP_PT_Panel(bpy.types.Panel):
         scene = context.scene
         
         layout.prop(scene, "blendermcp_port")
+        layout.prop(scene, "blendermcp_use_polyhaven", text="Use assets from Poly Haven")
         
         if not scene.blendermcp_server_running:
             layout.operator("blendermcp.start_server", text="Start MCP Server")
@@ -1161,7 +1178,7 @@ class BLENDERMCP_PT_Panel(bpy.types.Panel):
 # Operator to start the server
 class BLENDERMCP_OT_StartServer(bpy.types.Operator):
     bl_idname = "blendermcp.start_server"
-    bl_label = "Start BlenderMCP Server"
+    bl_label = "Connect to Claude"
     bl_description = "Start the BlenderMCP server to connect with Claude"
     
     def execute(self, context):
@@ -1180,8 +1197,8 @@ class BLENDERMCP_OT_StartServer(bpy.types.Operator):
 # Operator to stop the server
 class BLENDERMCP_OT_StopServer(bpy.types.Operator):
     bl_idname = "blendermcp.stop_server"
-    bl_label = "Stop BlenderMCP Server"
-    bl_description = "Stop the BlenderMCP server"
+    bl_label = "Stop the connection to Claude"
+    bl_description = "Stop the connection to Claude"
     
     def execute(self, context):
         scene = context.scene
@@ -1210,6 +1227,12 @@ def register():
         default=False
     )
     
+    bpy.types.Scene.blendermcp_use_polyhaven = bpy.props.BoolProperty(
+        name="Use Poly Haven",
+        description="Enable Poly Haven asset integration",
+        default=False
+    )
+    
     bpy.utils.register_class(BLENDERMCP_PT_Panel)
     bpy.utils.register_class(BLENDERMCP_OT_StartServer)
     bpy.utils.register_class(BLENDERMCP_OT_StopServer)
@@ -1228,6 +1251,7 @@ def unregister():
     
     del bpy.types.Scene.blendermcp_port
     del bpy.types.Scene.blendermcp_server_running
+    del bpy.types.Scene.blendermcp_use_polyhaven
     
     print("BlenderMCP addon unregistered")
 

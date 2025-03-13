@@ -80,8 +80,8 @@ uvx blender-mcp
 
 1. In Blender, go to the 3D View sidebar (press N if not visible)
 2. Find the "BlenderMCP" tab
-3. Set the port number (default: 9876)
-4. Click "Start MCP Server"
+3. Turn on the Poly Haven checkbox if you want assets from their API (optional)
+4. Click "Connect to Claude"
 5. Make sure the MCP server is running in your terminal
 
 ### Using with Claude

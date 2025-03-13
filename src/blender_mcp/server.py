@@ -196,17 +196,19 @@ mcp = FastMCP(
 
 # Global connection for resources (since resources can't access context)
 _blender_connection = None
+_polyhaven_enabled = False  # Add this global variable
 
 def get_blender_connection():
     """Get or create a persistent Blender connection"""
-    global _blender_connection
+    global _blender_connection, _polyhaven_enabled  # Add _polyhaven_enabled to globals
     
     # If we have an existing connection, check if it's still valid
     if _blender_connection is not None:
-        # Test if the connection is still alive with a simple ping
         try:
-            # Just try to send a small message to check if the socket is still connected
-            _blender_connection.sock.sendall(b'')
+            # First check if PolyHaven is enabled by sending a ping command
+            result = _blender_connection.send_command("get_polyhaven_status")
+            # Store the PolyHaven status globally
+            _polyhaven_enabled = result.get("enabled", False)
             return _blender_connection
         except Exception as e:
             # Connection is dead, close it and create a new one
@@ -260,33 +262,7 @@ def get_object_info(ctx: Context, object_name: str) -> str:
         logger.error(f"Error getting object info from Blender: {str(e)}")
         return f"Error getting object info: {str(e)}"
 
-# Tool endpoints
 
-@mcp.tool()
-
-
-@mcp.tool()
-def set_object_property(
-    ctx: Context,
-    name: str,
-    property: str,
-    value: Any
-) -> str:
-    """
-    Set a single property of an object.
-    
-    Parameters:
-    - name: Name of the object
-    - property: Property to set (location, rotation, scale, color, visible)
-    - value: New value for the property
-    """
-    try:
-        blender = get_blender_connection()
-        params = {"name": name, property: value}
-        result = blender.send_command("modify_object", params)
-        return f"Set {property} of {name} to {value}"
-    except Exception as e:
-        return f"Error setting property: {str(e)}"
 
 @mcp.tool()
 def create_object(
@@ -447,11 +423,11 @@ def get_polyhaven_categories(ctx: Context, asset_type: str = "hdris") -> str:
     
     Parameters:
     - asset_type: The type of asset to get categories for (hdris, textures, models, all)
-    
-    Returns a list of categories with the count of assets in each category.
     """
     try:
         blender = get_blender_connection()
+        if not _polyhaven_enabled:
+            return "PolyHaven integration is disabled. Select it in the sidebar in BlenderMCP, then run it again."
         result = blender.send_command("get_polyhaven_categories", {"asset_type": asset_type})
         
         if "error" in result:
@@ -632,25 +608,45 @@ def set_texture(
         logger.error(f"Error applying texture: {str(e)}")
         return f"Error applying texture: {str(e)}"
 
+@mcp.tool()
+def get_polyhaven_status(ctx: Context) -> str:
+    """
+    Check if PolyHaven integration is enabled in Blender.
+    Returns a message indicating whether PolyHaven features are available.
+    """
+    try:
+        blender = get_blender_connection()
+        result = blender.send_command("get_polyhaven_status")
+        enabled = result.get("enabled", False)
+        message = result.get("message", "")
+        
+        return message
+    except Exception as e:
+        logger.error(f"Error checking PolyHaven status: {str(e)}")
+        return f"Error checking PolyHaven status: {str(e)}"
+
 @mcp.prompt()
 def asset_creation_strategy() -> str:
     """Defines the preferred strategy for creating assets in Blender"""
-    return """When creating 3D content in Blender, follow these priorities:
+    return """When creating 3D content in Blender, always start by checking if PolyHaven is available:
 
-    1. First, try to find and use appropriate PolyHaven assets:
+    0. Before anything, always check the scene from get_scene_info()
+    1. First use get_polyhaven_status() to verify if PolyHaven integration is enabled.
+
+    2. If PolyHaven is enabled:
        - For objects/models: Use download_polyhaven_asset() with asset_type="models"
        - For materials/textures: Use download_polyhaven_asset() with asset_type="textures"
        - For environment lighting: Use download_polyhaven_asset() with asset_type="hdris"
 
-    2. Only fall back to basic creation tools when:
-       - A simple primitive is explicitly requested
-       - No suitable PolyHaven asset exists
-       - The task specifically requires a basic material/color
-       - Time or resource constraints make downloading assets impractical
+    3. If PolyHaven is disabled or when falling back to basic tools:
+       - create_object() for basic primitives (CUBE, SPHERE, CYLINDER, etc.)
+       - set_material() for basic colors and materials
 
-    Basic creation tools to use as fallback:
-    - create_object() for basic primitives
-    - set_material() for basic colors and materials
+    Only fall back to basic creation tools when:
+    - PolyHaven is disabled
+    - A simple primitive is explicitly requested
+    - No suitable PolyHaven asset exists
+    - The task specifically requires a basic material/color
     """
 
 # Main execution
