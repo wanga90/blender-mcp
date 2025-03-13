@@ -2,7 +2,7 @@
 
 BlenderMCP connects Blender to Claude AI through the Model Context Protocol (MCP), allowing Claude to directly interact with and control Blender. This integration enables prompt assisted 3D modeling, scene creation, and manipulation.
 
-## Release notes (1.2.0)
+## Release notes (1.1.0)
 
 - Added support for Poly Haven assets through their API
 - For newcomers, you can go straight to Installation. For existing users, see the points below
