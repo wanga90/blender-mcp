@@ -124,7 +124,7 @@ To see everything in Poly Haven, [see here](https://polyhaven.com/)
 Here are some examples of what you can ask Claude to do:
 
 - "Create a low poly scene in a dungeon, with a dragon guarding a pot of gold" [Demo](https://www.youtube.com/watch?v=DqgKuLYUv00)
-- "Create a beach vibe using HDRIs, textures, and models like rocks and vegatation from Poly Haven" [Demo](https://www.youtube.com/watch?v=Clm1CIbBhPw)
+- "Create a beach vibe using HDRIs, textures, and models like rocks and vegatation from Poly Haven" [Demo](https://www.youtube.com/watch?v=I29rn92gkC4)
 - Give a reference image, and create a Blender scene out of it [Demo](https://www.youtube.com/watch?v=FDRb03XPiRo)
 - "Get information about the current scene, and make a threejs sketch from it" [Demo](https://www.youtube.com/watch?v=jxbNI5L7AH8)
 - "Make this car red and metallic" 
