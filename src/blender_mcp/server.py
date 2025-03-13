@@ -632,6 +632,26 @@ def set_texture(
         logger.error(f"Error applying texture: {str(e)}")
         return f"Error applying texture: {str(e)}"
 
+@mcp.prompt()
+def asset_creation_strategy() -> str:
+    """Defines the preferred strategy for creating assets in Blender"""
+    return """When creating 3D content in Blender, follow these priorities:
+
+    1. First, try to find and use appropriate PolyHaven assets:
+       - For objects/models: Use download_polyhaven_asset() with asset_type="models"
+       - For materials/textures: Use download_polyhaven_asset() with asset_type="textures"
+       - For environment lighting: Use download_polyhaven_asset() with asset_type="hdris"
+
+    2. Only fall back to basic creation tools when:
+       - A simple primitive is explicitly requested
+       - No suitable PolyHaven asset exists
+       - The task specifically requires a basic material/color
+       - Time or resource constraints make downloading assets impractical
+
+    Basic creation tools to use as fallback:
+    - create_object() for basic primitives
+    - set_material() for basic colors and materials
+    """
 
 # Main execution
 
