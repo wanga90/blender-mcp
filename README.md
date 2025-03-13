@@ -2,6 +2,13 @@
 
 BlenderMCP connects Blender to Claude AI through the Model Context Protocol (MCP), allowing Claude to directly interact with and control Blender. This integration enables prompt assisted 3D modeling, scene creation, and manipulation.
 
+## Release notes (1.2.0)
+
+- Added support for Poly Haven assets through their API
+- For newcomers, you can go straight to Installation. For existing users, see the points below
+- Download the latest addon.py file and replace the older one, then add it to Blender
+- Delete the MCP server from Claude and add it back again, and you should be good to go!
+
 ## Features
 
 - **Two-way communication**: Connect Claude AI to Blender through a socket-based server
@@ -85,8 +92,8 @@ uvx blender-mcp
 
 1. In Blender, go to the 3D View sidebar (press N if not visible)
 2. Find the "BlenderMCP" tab
-3. Set the port number (default: 9876)
-4. Click "Start MCP Server"
+3. Turn on the Poly Haven checkbox if you want assets from their API (optional)
+4. Click "Connect to Claude"
 5. Make sure the MCP server is running in your terminal
 
 ### Using with Claude
@@ -106,12 +113,18 @@ Once the config file has been set on Claude, and the addon is running on Blender
 - `delete_object` - Remove an object from the scene
 - `set_material` - Apply or create materials for objects
 - `execute_blender_code` - Run any Python code in Blender
+- `get_polyhaven_categories` - Get a list of categories for PolyHaven assets (HDRIs, textures, models)
+- `search_polyhaven_assets` - Search for assets on PolyHaven with optional category filtering
+- `download_polyhaven_asset` - Download and import a PolyHaven asset into Blender
+
+To see everything in Poly Haven, [see here](https://polyhaven.com/)
 
 ### Example Commands
 
 Here are some examples of what you can ask Claude to do:
 
 - "Create a low poly scene in a dungeon, with a dragon guarding a pot of gold" [Demo](https://www.youtube.com/watch?v=DqgKuLYUv00)
+- "Create a beach vibe using HDRIs, textures, and models like rocks and vegatation from Poly Haven" [Demo](https://www.youtube.com/watch?v=Clm1CIbBhPw)
 - Give a reference image, and create a Blender scene out of it [Demo](https://www.youtube.com/watch?v=FDRb03XPiRo)
 - "Get information about the current scene, and make a threejs sketch from it" [Demo](https://www.youtube.com/watch?v=jxbNI5L7AH8)
 - "Make this car red and metallic" 
@@ -121,9 +134,11 @@ Here are some examples of what you can ask Claude to do:
 
 ## Troubleshooting
 
-- **Connection issues**: Make sure the Blender addon server is running, and the MCP server is configured on Claude, DO NOT run the uvx command in the terminal
+- **Connection issues**: Make sure the Blender addon server is running, and the MCP server is configured on Claude, DO NOT run the uvx command in the terminal. Sometimes, the first command won't go through but after that it starts working.
 - **Timeout errors**: Try simplifying your requests or breaking them into smaller steps
+- **Poly Haven integration**: Claude is sometimes erratic with its behaviour
 - **Have you tried turning it off and on again?**: If you're still having connection errors, try restarting both Claude and the Blender server
+
 
 ## Technical Details
 
@@ -137,6 +152,7 @@ The system uses a simple JSON-based protocol over TCP sockets:
 ## Limitations & Security Considerations
 
 - The `execute_blender_code` tool allows running arbitrary Python code in Blender, which can be powerful but potentially dangerous. Use with caution in production environments. ALWAYS save your work before using it.
+- Poly Haven requires downloading models, textures, and HDRI images. If you do not want to use it, please turn it off in the checkbox in Blender. 
 - Complex operations might need to be broken down into smaller steps
 
 
