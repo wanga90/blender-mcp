@@ -278,7 +278,13 @@ class BlenderMCPServer:
         if name:
             obj.name = name
 
-        return {"name": obj.name}
+        return {
+            "name": obj.name,
+            "type": obj.type,
+            "location": [obj.location.x, obj.location.y, obj.location.z],
+            "rotation": [obj.rotation_euler.x, obj.rotation_euler.y, obj.rotation_euler.z],
+            "scale": [obj.scale.x, obj.scale.y, obj.scale.z],
+        }
 
 
     def modify_object(self, name, location=None, rotation=None, scale=None, visible=None):
