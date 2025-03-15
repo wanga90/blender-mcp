@@ -271,7 +271,17 @@ def create_object(
     name: str = None,
     location: List[float] = None,
     rotation: List[float] = None,
-    scale: List[float] = None
+    scale: List[float] = None,
+    # Torus-specific parameters
+    align: str = "WORLD",
+    major_segments: int = 48,
+    minor_segments: int = 12,
+    mode: str = "MAJOR_MINOR",
+    major_radius: float = 1.0,
+    minor_radius: float = 0.25,
+    abso_major_rad: float = 1.25,
+    abso_minor_rad: float = 0.75,
+    generate_uvs: bool = True
 ) -> str:
     """
     Create a new object in the Blender scene.
@@ -281,7 +291,21 @@ def create_object(
     - name: Optional name for the object
     - location: Optional [x, y, z] location coordinates
     - rotation: Optional [x, y, z] rotation in radians
-    - scale: Optional [x, y, z] scale factors
+    - scale: Optional [x, y, z] scale factors (not used for TORUS)
+    
+    Torus-specific parameters (only used when type == "TORUS"):
+    - align: How to align the torus ('WORLD', 'VIEW', or 'CURSOR')
+    - major_segments: Number of segments for the main ring
+    - minor_segments: Number of segments for the cross-section
+    - mode: Dimension mode ('MAJOR_MINOR' or 'EXT_INT')
+    - major_radius: Radius from the origin to the center of the cross sections
+    - minor_radius: Radius of the torus' cross section
+    - abso_major_rad: Total exterior radius of the torus
+    - abso_minor_rad: Total interior radius of the torus
+    - generate_uvs: Whether to generate a default UV map
+    
+    Returns:
+    A message indicating the created object name.
     """
     try:
         # Get the global connection
@@ -296,17 +320,35 @@ def create_object(
             "type": type,
             "location": loc,
             "rotation": rot,
-            "scale": sc
         }
         
         if name:
             params["name"] = name
-            
-        result = blender.send_command("create_object", params)
-        return f"Created {type} object: {result['name']}"
+
+        if type == "TORUS":
+            # For torus, the scale is not used.
+            params.update({
+                "align": align,
+                "major_segments": major_segments,
+                "minor_segments": minor_segments,
+                "mode": mode,
+                "major_radius": major_radius,
+                "minor_radius": minor_radius,
+                "abso_major_rad": abso_major_rad,
+                "abso_minor_rad": abso_minor_rad,
+                "generate_uvs": generate_uvs
+            })
+            result = blender.send_command("create_object", params)
+            return f"Created {type} object: {result['name']}"
+        else:
+            # For non-torus objects, include scale
+            params["scale"] = sc
+            result = blender.send_command("create_object", params)
+            return f"Created {type} object: {result['name']}"
     except Exception as e:
         logger.error(f"Error creating object: {str(e)}")
         return f"Error creating object: {str(e)}"
+
 
 @mcp.tool()
 def modify_object(

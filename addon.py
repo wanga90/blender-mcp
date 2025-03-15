@@ -231,12 +231,13 @@ class BlenderMCPServer:
             traceback.print_exc()
             return {"error": str(e)}
     
-    def create_object(self, type="CUBE", name=None, location=(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1)):
+    def create_object(self, type="CUBE", name=None, location=(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1),
+                    align="WORLD", major_segments=48, minor_segments=12, mode="MAJOR_MINOR",
+                    major_radius=1.0, minor_radius=0.25, abso_major_rad=1.25, abso_minor_rad=0.75, generate_uvs=True):
         """Create a new object in the scene"""
         # Deselect all objects
         bpy.ops.object.select_all(action='DESELECT')
         
-        # Create the object based on type
         if type == "CUBE":
             bpy.ops.mesh.primitive_cube_add(location=location, rotation=rotation, scale=scale)
         elif type == "SPHERE":
@@ -248,7 +249,19 @@ class BlenderMCPServer:
         elif type == "CONE":
             bpy.ops.mesh.primitive_cone_add(location=location, rotation=rotation, scale=scale)
         elif type == "TORUS":
-            bpy.ops.mesh.primitive_torus_add(location=location, rotation=rotation, scale=scale)
+            bpy.ops.mesh.primitive_torus_add(
+                align=align,
+                location=location,
+                rotation=rotation,
+                major_segments=major_segments,
+                minor_segments=minor_segments,
+                mode=mode,
+                major_radius=major_radius,
+                minor_radius=minor_radius,
+                abso_major_rad=abso_major_rad,
+                abso_minor_rad=abso_minor_rad,
+                generate_uvs=generate_uvs
+            )
         elif type == "EMPTY":
             bpy.ops.object.empty_add(location=location, rotation=rotation, scale=scale)
         elif type == "CAMERA":
@@ -261,10 +274,10 @@ class BlenderMCPServer:
         # Get the created object
         obj = bpy.context.active_object
         
-        # Rename if name is provided
+        # Rename the object if a name is provided
         if name:
             obj.name = name
-        
+
         return {
             "name": obj.name,
             "type": obj.type,
@@ -272,7 +285,8 @@ class BlenderMCPServer:
             "rotation": [obj.rotation_euler.x, obj.rotation_euler.y, obj.rotation_euler.z],
             "scale": [obj.scale.x, obj.scale.y, obj.scale.z],
         }
-    
+
+
     def modify_object(self, name, location=None, rotation=None, scale=None, visible=None):
         """Modify an existing object in the scene"""
         # Find the object by name
