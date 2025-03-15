@@ -33,11 +33,11 @@ The system consists of two main components:
 - Python 3.10 or newer
 - uv package manager: 
 
-If you're on Mac, please install uv as
+**If you're on Mac, please install uv as**
 ```bash
 brew install uv
 ```
-On Windows
+**On Windows**
 ```bash
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex" 
 ```
