@@ -39,7 +39,11 @@ brew install uv
 ```
 On Windows
 ```bash
-pip install uv
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex" 
+```
+and then
+```bash
+set Path=C:\Users\nntra\.local\bin;%Path%
 ```
 
 Otherwise installation instructions are on their website: [Install uv](https://docs.astral.sh/uv/getting-started/installation/)
