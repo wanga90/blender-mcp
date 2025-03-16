@@ -7,6 +7,10 @@ import logging
 from dataclasses import dataclass
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Dict, Any, List
+import os
+from pathlib import Path
+import base64
+from urllib.parse import urlparse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, 
@@ -667,27 +671,247 @@ def get_polyhaven_status(ctx: Context) -> str:
         logger.error(f"Error checking PolyHaven status: {str(e)}")
         return f"Error checking PolyHaven status: {str(e)}"
 
+@mcp.tool()
+def get_hyper3d_status(ctx: Context) -> str:
+    """
+    Check if Hyper3D Rodin integration is enabled in Blender.
+    Returns a message indicating whether Hyper3D Rodin features are available.
+    """
+    try:
+        blender = get_blender_connection()
+        result = blender.send_command("get_hyper3d_status")
+        enabled = result.get("enabled", False)
+        message = result.get("message", "")
+        if enabled:
+            message += ""
+        return message
+    except Exception as e:
+        logger.error(f"Error checking Hyper3D status: {str(e)}")
+        return f"Error checking Hyper3D status: {str(e)}"
+
+@mcp.tool()
+def generate_hyper3d_model_via_text(
+    ctx: Context,
+    text_prompt: str,
+    bbox_condition: list[float]=None
+) -> str:
+    """
+    Generate 3D asset using Hyper3D by giving description of the desired asset, and import the asset into Blender.
+    The 3D asset has built-in materials.
+    The generated model has a normalized size, so re-scaling after generation can be useful.
+    
+    Parameters:
+    - text_prompt: A short description of the desired model in **English**.
+    - bbox_condition: Optional. If given, it has to be a list of floats of length 3. Controls the ratio between [Length, Width, Height] of the model. The final size of the model is normalized.
+
+    Returns a message indicating success or failure.
+    """
+    try:
+        blender = get_blender_connection()
+        result = blender.send_command("create_rodin_job", {
+            "text_prompt": text_prompt,
+            "images": None,
+            "bbox_condition": bbox_condition,
+        })
+        succeed = result.get("submit_time", False)
+        if succeed:
+            return json.dumps({
+                "task_uuid": result["uuid"],
+                "subscription_key": result["jobs"]["subscription_key"],
+            })
+        else:
+            return json.dumps(result)
+    except Exception as e:
+        logger.error(f"Error generating Hyper3D task: {str(e)}")
+        return f"Error generating Hyper3D task: {str(e)}"
+    return f"Placeholder, under development, not implemented yet."
+
+@mcp.tool()
+def generate_hyper3d_model_via_images(
+    ctx: Context,
+    input_image_paths: list[str]=None,
+    input_image_urls: list[str]=None,
+    bbox_condition: list[float]=None
+) -> str:
+    """
+    Generate 3D asset using Hyper3D by giving images of the wanted asset, and import the generated asset into Blender.
+    The 3D asset has built-in materials.
+    The generated model has a normalized size, so re-scaling after generation can be useful.
+    
+    Parameters:
+    - input_image_paths: The **absolute** paths of input images. Even if only one image is provided, wrap it into a list. Required if Hyper3D Rodin in MAIN_SITE mode.
+    - input_image_urls: The URLs of input images. Even if only one image is provided, wrap it into a list. Required if Hyper3D Rodin in FAL_AI mode.
+    - bbox_condition: Optional. If given, it has to be a list of ints of length 3. Controls the ratio between [Length, Width, Height] of the model. The final size of the model is normalized.
+
+    Only one of {input_image_paths, input_image_urls} should be given at a time, depending on the Hyper3D Rodin's current mode.
+    Returns a message indicating success or failure.
+    """
+    if input_image_paths is not None and input_image_urls is not None:
+        return f"Error: Conflict parameters given!"
+    if input_image_paths is None and input_image_urls is None:
+        return f"Error: No image given!"
+    if input_image_paths is not None:
+        if not all(os.path.exists(i) for i in input_image_paths):
+            return "Error: not all image paths are valid!"
+        images = []
+        for path in input_image_paths:
+            with open(path, "rb") as f:
+                images.append(
+                    (Path(path).suffix, base64.b64encode(f.read()).decode("ascii"))
+                )
+    elif input_image_urls is not None:
+        if not all(urlparse(i) for i in input_image_paths):
+            return "Error: not all image URLs are valid!"
+        images = input_image_urls.copy()
+    try:
+        blender = get_blender_connection()
+        result = blender.send_command("create_rodin_job", {
+            "text_prompt": None,
+            "images": images,
+            "bbox_condition": bbox_condition,
+        })
+        succeed = result.get("submit_time", False)
+        if succeed:
+            return json.dumps({
+                "task_uuid": result["uuid"],
+                "subscription_key": result["jobs"]["subscription_key"],
+            })
+        else:
+            return json.dumps(result)
+    except Exception as e:
+        logger.error(f"Error generating Hyper3D task: {str(e)}")
+        return f"Error generating Hyper3D task: {str(e)}"
+
+@mcp.tool()
+def poll_rodin_job_status(
+    ctx: Context,
+    subscription_key: str=None,
+    request_id: str=None,
+):
+    """
+    Check if the Hyper3D Rodin generation task is completed.
+
+    For Hyper3D Rodin mode MAIN_SITE:
+        Parameters:
+        - subscription_key: The subscription_key given in the generate model step.
+
+        Returns a list of status. The task is done if all status are "Done".
+        If "Failed" showed up, the generating process failed.
+        This is a polling API, so only proceed if the status are finally determined ("Done" or "Canceled").
+
+    For Hyper3D Rodin mode FAL_AI:
+        Parameters:
+        - request_id: The request_id given in the generate model step.
+
+        Returns the generation task status. The task is done if status is "COMPLETED".
+        The task is in progress if status is "IN_PROGRESS".
+        If status other than "COMPLETED", "IN_PROGRESS", "IN_QUEUE" showed up, the generating process might be failed.
+        This is a polling API, so only proceed if the status are finally determined ("COMPLETED" or some failed state).
+    """
+    try:
+        blender = get_blender_connection()
+        kwargs = {}
+        if subscription_key:
+            kwargs = {
+                "subscription_key": subscription_key,
+            }
+        elif request_id:
+            kwargs = {
+                "request_id": request_id,
+            }
+        result = blender.send_command("poll_rodin_job_status", kwargs)
+        return result
+    except Exception as e:
+        logger.error(f"Error generating Hyper3D task: {str(e)}")
+        return f"Error generating Hyper3D task: {str(e)}"
+
+@mcp.tool()
+def import_generated_asset(
+    ctx: Context,
+    name: str,
+    task_uuid: str=None,
+    request_id: str=None,
+):
+    """
+    Import the asset generated by Hyper3D Rodin after the generation task is completed.
+
+    Parameters:
+    - name: The name of the object in scene
+    - task_uuid: For Hyper3D Rodin mode MAIN_SITE: The task_uuid given in the generate model step.
+    - request_id: For Hyper3D Rodin mode FAL_AI: The request_id given in the generate model step.
+
+    Only give one of {task_uuid, request_id} based on the Hyper3D Rodin Mode!
+    Return if the asset has been imported successfully.
+    """
+    try:
+        blender = get_blender_connection()
+        kwargs = {
+            "name": name
+        }
+        if task_uuid:
+            kwargs["task_uuid"] = task_uuid
+        elif request_id:
+            kwargs["request_id"] = request_id
+        result = blender.send_command("import_generated_asset", kwargs)
+        return result
+    except Exception as e:
+        logger.error(f"Error generating Hyper3D task: {str(e)}")
+        return f"Error generating Hyper3D task: {str(e)}"
+
 @mcp.prompt()
 def asset_creation_strategy() -> str:
     """Defines the preferred strategy for creating assets in Blender"""
-    return """When creating 3D content in Blender, always start by checking if PolyHaven is available:
+    return """When creating 3D content in Blender, always start by checking if integrations are available:
 
     0. Before anything, always check the scene from get_scene_info()
-    1. First use get_polyhaven_status() to verify if PolyHaven integration is enabled.
+    1. First use the following tools to verify if the following integrations are enabled:
+        1. PolyHaven
+            Use get_polyhaven_status() to verify its status
+            If PolyHaven is enabled:
+            - For objects/models: Use download_polyhaven_asset() with asset_type="models"
+            - For materials/textures: Use download_polyhaven_asset() with asset_type="textures"
+            - For environment lighting: Use download_polyhaven_asset() with asset_type="hdris"
+        2. Hyper3D(Rodin)
+            Hyper3D Rodin is good at generating 3D models for single item.
+            So don't try to:
+            1. Generate the whole scene with one shot
+            2. Generate ground using Rodin
+            3. Generate parts of the items separately and put them together afterwards
 
-    2. If PolyHaven is enabled:
-       - For objects/models: Use download_polyhaven_asset() with asset_type="models"
-       - For materials/textures: Use download_polyhaven_asset() with asset_type="textures"
-       - For environment lighting: Use download_polyhaven_asset() with asset_type="hdris"
+            Use get_hyper3d_status() to verify its status
+            If Hyper3D is enabled:
+            - For objects/models, do the following steps:
+                1. Create the model generation task
+                    - Use generate_hyper3d_model_via_images() if image(s) is/are given
+                    - Use generate_hyper3d_model_via_text() if generating 3D asset using text prompt
+                2. Poll the status
+                    - Use poll_rodin_job_status() to check if the generation task has completed or failed
+                3. Import the asset
+                    - Use import_generated_asset() to import the generated GLB model the asset
+                4. After importing the asset, ALWAYS check the world_bounding_box of the imported mesh, and adjust the mesh's location and size
+                    Adjust the imported mesh's location, scale, rotation, so that the mesh is on the right spot.
 
-    3. If PolyHaven is disabled or when falling back to basic tools:
+                You can reuse assets previous generated by repeating step 3 and 4 using the previous task_uuid without creating another generation task.
+       
+    2. If all integrations are disabled or when falling back to basic tools:
        - create_object() for basic primitives (CUBE, SPHERE, CYLINDER, etc.)
        - set_material() for basic colors and materials
+    
+    3. When including an object into scene, ALWAYS make sure that the name of the object is meanful.
+
+    4. Always check the world_bounding_box for each item so that:
+        - Ensure that all objects that should not be clipping are not clipping.
+        - Items have right spatial relationship.
+    
+    5. After giving the tool location/scale/rotation information (via create_object() and modify_object()),
+       double check the related object's location, scale, rotation, and world_bounding_box using get_object_info(),
+       so that the object is in the desired location.
 
     Only fall back to basic creation tools when:
-    - PolyHaven is disabled
+    - PolyHaven and Hyper3D are disabled
     - A simple primitive is explicitly requested
     - No suitable PolyHaven asset exists
+    - Hyper3D Rodin failed to generate the desired asset
     - The task specifically requires a basic material/color
     """
 
