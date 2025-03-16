@@ -293,7 +293,8 @@ class BlenderMCPServer:
             raise ValueError(f"Unsupported object type: {type}")
         
         # Get the created object
-        obj = bpy.context.active_object
+        bpy.context.view_layer.update()
+        obj = bpy.context.view_layer.objects.active
         
         # Rename the object if a name is provided
         if name:
@@ -359,9 +360,8 @@ class BlenderMCPServer:
         obj_name = obj.name
         
         # Select and delete the object
-        bpy.ops.object.select_all(action='DESELECT')
-        obj.select_set(True)
-        bpy.ops.object.delete()
+        if obj:
+            bpy.data.objects.remove(obj, do_unlink=True)
         
         return {"deleted": obj_name}
     
