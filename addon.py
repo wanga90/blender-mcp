@@ -266,63 +266,81 @@ class BlenderMCPServer:
                     align="WORLD", major_segments=48, minor_segments=12, mode="MAJOR_MINOR",
                     major_radius=1.0, minor_radius=0.25, abso_major_rad=1.25, abso_minor_rad=0.75, generate_uvs=True):
         """Create a new object in the scene"""
-        # Deselect all objects
-        bpy.ops.object.select_all(action='DESELECT')
-        
-        if type == "CUBE":
-            bpy.ops.mesh.primitive_cube_add(location=location, rotation=rotation, scale=scale)
-        elif type == "SPHERE":
-            bpy.ops.mesh.primitive_uv_sphere_add(location=location, rotation=rotation, scale=scale)
-        elif type == "CYLINDER":
-            bpy.ops.mesh.primitive_cylinder_add(location=location, rotation=rotation, scale=scale)
-        elif type == "PLANE":
-            bpy.ops.mesh.primitive_plane_add(location=location, rotation=rotation, scale=scale)
-        elif type == "CONE":
-            bpy.ops.mesh.primitive_cone_add(location=location, rotation=rotation, scale=scale)
-        elif type == "TORUS":
-            bpy.ops.mesh.primitive_torus_add(
-                align=align,
-                location=location,
-                rotation=rotation,
-                major_segments=major_segments,
-                minor_segments=minor_segments,
-                mode=mode,
-                major_radius=major_radius,
-                minor_radius=minor_radius,
-                abso_major_rad=abso_major_rad,
-                abso_minor_rad=abso_minor_rad,
-                generate_uvs=generate_uvs
-            )
-        elif type == "EMPTY":
-            bpy.ops.object.empty_add(location=location, rotation=rotation, scale=scale)
-        elif type == "CAMERA":
-            bpy.ops.object.camera_add(location=location, rotation=rotation)
-        elif type == "LIGHT":
-            bpy.ops.object.light_add(type='POINT', location=location, rotation=rotation, scale=scale)
-        else:
-            raise ValueError(f"Unsupported object type: {type}")
-        
-        # Get the created object
-        bpy.context.view_layer.update()
-        obj = bpy.context.view_layer.objects.active
-        
-        # Rename the object if a name is provided
-        if name:
-            obj.name = name
-
-        result = {
-            "name": obj.name,
-            "type": obj.type,
-            "location": [obj.location.x, obj.location.y, obj.location.z],
-            "rotation": [obj.rotation_euler.x, obj.rotation_euler.y, obj.rotation_euler.z],
-            "scale": [obj.scale.x, obj.scale.y, obj.scale.z],
-        }
-
-        if obj.type == "MESH":
-            bounding_box = self._get_aabb(obj)
-            result["world_bounding_box"] = bounding_box
-
-        return result
+        try:
+            # Deselect all objects first
+            bpy.ops.object.select_all(action='DESELECT')
+            
+            # Create the object based on type
+            if type == "CUBE":
+                bpy.ops.mesh.primitive_cube_add(location=location, rotation=rotation, scale=scale)
+            elif type == "SPHERE":
+                bpy.ops.mesh.primitive_uv_sphere_add(location=location, rotation=rotation, scale=scale)
+            elif type == "CYLINDER":
+                bpy.ops.mesh.primitive_cylinder_add(location=location, rotation=rotation, scale=scale)
+            elif type == "PLANE":
+                bpy.ops.mesh.primitive_plane_add(location=location, rotation=rotation, scale=scale)
+            elif type == "CONE":
+                bpy.ops.mesh.primitive_cone_add(location=location, rotation=rotation, scale=scale)
+            elif type == "TORUS":
+                bpy.ops.mesh.primitive_torus_add(
+                    align=align,
+                    location=location,
+                    rotation=rotation,
+                    major_segments=major_segments,
+                    minor_segments=minor_segments,
+                    mode=mode,
+                    major_radius=major_radius,
+                    minor_radius=minor_radius,
+                    abso_major_rad=abso_major_rad,
+                    abso_minor_rad=abso_minor_rad,
+                    generate_uvs=generate_uvs
+                )
+            elif type == "EMPTY":
+                bpy.ops.object.empty_add(location=location, rotation=rotation, scale=scale)
+            elif type == "CAMERA":
+                bpy.ops.object.camera_add(location=location, rotation=rotation)
+            elif type == "LIGHT":
+                bpy.ops.object.light_add(type='POINT', location=location, rotation=rotation, scale=scale)
+            else:
+                raise ValueError(f"Unsupported object type: {type}")
+            
+            # Force update the view layer
+            bpy.context.view_layer.update()
+            
+            # Get the active object (which should be our newly created object)
+            obj = bpy.context.view_layer.objects.active
+            
+            # If we don't have an active object, something went wrong
+            if obj is None:
+                raise RuntimeError("Failed to create object - no active object")
+            
+            # Make sure it's selected
+            obj.select_set(True)
+            
+            # Rename if name is provided
+            if name:
+                obj.name = name
+                if obj.data:
+                    obj.data.name = name
+            
+            # Return the object info
+            result = {
+                "name": obj.name,
+                "type": obj.type,
+                "location": [obj.location.x, obj.location.y, obj.location.z],
+                "rotation": [obj.rotation_euler.x, obj.rotation_euler.y, obj.rotation_euler.z],
+                "scale": [obj.scale.x, obj.scale.y, obj.scale.z],
+            }
+            
+            if obj.type == "MESH":
+                bounding_box = self._get_aabb(obj)
+                result["world_bounding_box"] = bounding_box
+            
+            return result
+        except Exception as e:
+            print(f"Error in create_object: {str(e)}")
+            traceback.print_exc()
+            return {"error": str(e)}
 
     def modify_object(self, name, location=None, rotation=None, scale=None, visible=None):
         """Modify an existing object in the scene"""
