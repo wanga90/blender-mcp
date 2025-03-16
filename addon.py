@@ -1,4 +1,5 @@
 import bpy
+import mathutils
 import json
 import threading
 import socket
@@ -231,6 +232,26 @@ class BlenderMCPServer:
             traceback.print_exc()
             return {"error": str(e)}
     
+    @staticmethod
+    def _get_aabb(obj):
+        """ Returns the world-space axis-aligned bounding box (AABB) of an object. """
+        if obj.type != 'MESH':
+            raise TypeError("Object must be a mesh")
+
+        # Get the bounding box corners in local space
+        local_bbox_corners = [mathutils.Vector(corner) for corner in obj.bound_box]
+
+        # Convert to world coordinates
+        world_bbox_corners = [obj.matrix_world @ corner for corner in local_bbox_corners]
+
+        # Compute axis-aligned min/max coordinates
+        min_corner = mathutils.Vector(map(min, zip(*world_bbox_corners)))
+        max_corner = mathutils.Vector(map(max, zip(*world_bbox_corners)))
+
+        return [
+            [*min_corner], [*max_corner]
+        ]
+
     def create_object(self, type="CUBE", name=None, location=(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1),
                     align="WORLD", major_segments=48, minor_segments=12, mode="MAJOR_MINOR",
                     major_radius=1.0, minor_radius=0.25, abso_major_rad=1.25, abso_minor_rad=0.75, generate_uvs=True):
@@ -278,7 +299,7 @@ class BlenderMCPServer:
         if name:
             obj.name = name
 
-        return {
+        result = {
             "name": obj.name,
             "type": obj.type,
             "location": [obj.location.x, obj.location.y, obj.location.z],
@@ -286,6 +307,11 @@ class BlenderMCPServer:
             "scale": [obj.scale.x, obj.scale.y, obj.scale.z],
         }
 
+        if obj.type == "MESH":
+            bounding_box = self._get_aabb(obj)
+            result["world_bounding_box"] = bounding_box
+
+        return result
 
     def modify_object(self, name, location=None, rotation=None, scale=None, visible=None):
         """Modify an existing object in the scene"""
@@ -308,7 +334,7 @@ class BlenderMCPServer:
             obj.hide_viewport = not visible
             obj.hide_render = not visible
         
-        return {
+        result = {
             "name": obj.name,
             "type": obj.type,
             "location": [obj.location.x, obj.location.y, obj.location.z],
@@ -316,7 +342,13 @@ class BlenderMCPServer:
             "scale": [obj.scale.x, obj.scale.y, obj.scale.z],
             "visible": obj.visible_get(),
         }
-    
+
+        if obj.type == "MESH":
+            bounding_box = self._get_aabb(obj)
+            result["world_bounding_box"] = bounding_box
+
+        return result
+
     def delete_object(self, name):
         """Delete an object from the scene"""
         obj = bpy.data.objects.get(name)
@@ -349,6 +381,10 @@ class BlenderMCPServer:
             "visible": obj.visible_get(),
             "materials": [],
         }
+
+        if obj.type == "MESH":
+            bounding_box = self._get_aabb(obj)
+            obj_info["world_bounding_box"] = bounding_box
         
         # Add material slots
         for slot in obj.material_slots:
