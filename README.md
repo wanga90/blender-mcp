@@ -137,6 +137,10 @@ Here are some examples of what you can ask Claude to do:
 - "Make the lighting like a studio"
 - "Point the camera at the scene, and make it isometric"
 
+## Hyper3D integration
+
+Hyper3D's free trial key allows you to generate a limited number of models per day. If the daily limit is reached, you can wait for the next day's reset or obtain your own key from hyper3d.ai and fal.ai.
+
 ## Troubleshooting
 
 - **Connection issues**: Make sure the Blender addon server is running, and the MCP server is configured on Claude, DO NOT run the uvx command in the terminal. Sometimes, the first command won't go through but after that it starts working.
