@@ -4,20 +4,20 @@ import json
 import threading
 import socket
 import time
-import requests  # Add this import for HTTP requests
-import tempfile  # Add this import for temporary directories
-from bpy.props import StringProperty, IntProperty
+import requests
+import tempfile
 import traceback
 import os
 import shutil
+from bpy.props import StringProperty, IntProperty, BoolProperty, EnumProperty
 
 bl_info = {
-    "name": "Blender MCP",
+    "name": "Blender MCP Fixed",
     "author": "BlenderMCP",
-    "version": (0, 1),
+    "version": (0, 2),
     "blender": (3, 0, 0),
     "location": "View3D > Sidebar > BlenderMCP",
-    "description": "Connect Blender to Claude via MCP",
+    "description": "Connect Blender to Claude via MCP (Fixed Version)",
     "category": "Interface",
 }
 
@@ -27,21 +27,27 @@ class BlenderMCPServer:
         self.port = port
         self.running = False
         self.socket = None
-        self.client = None
-        self.command_queue = []
-        self.buffer = b''  # Add buffer for incomplete data
+        self.server_thread = None
     
     def start(self):
+        if self.running:
+            print("Server is already running")
+            return
+            
         self.running = True
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         
         try:
+            # Create socket
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.socket.bind((self.host, self.port))
             self.socket.listen(1)
-            self.socket.setblocking(False)
-            # Register the timer
-            bpy.app.timers.register(self._process_server, persistent=True)
+            
+            # Start server thread
+            self.server_thread = threading.Thread(target=self._server_loop)
+            self.server_thread.daemon = True
+            self.server_thread.start()
+            
             print(f"BlenderMCP server started on {self.host}:{self.port}")
         except Exception as e:
             print(f"Failed to start server: {str(e)}")
@@ -49,79 +55,118 @@ class BlenderMCPServer:
             
     def stop(self):
         self.running = False
-        if hasattr(bpy.app.timers, "unregister"):
-            if bpy.app.timers.is_registered(self._process_server):
-                bpy.app.timers.unregister(self._process_server)
+        
+        # Close socket
         if self.socket:
-            self.socket.close()
-        if self.client:
-            self.client.close()
-        self.socket = None
-        self.client = None
+            try:
+                self.socket.close()
+            except:
+                pass
+            self.socket = None
+        
+        # Wait for thread to finish
+        if self.server_thread:
+            try:
+                if self.server_thread.is_alive():
+                    self.server_thread.join(timeout=1.0)
+            except:
+                pass
+            self.server_thread = None
+        
         print("BlenderMCP server stopped")
-
-    def _process_server(self):
-        """Timer callback to process server operations"""
-        if not self.running:
-            return None  # Unregister timer
-            
-        try:
-            # Accept new connections
-            if not self.client and self.socket:
+    
+    def _server_loop(self):
+        """Main server loop in a separate thread"""
+        print("Server thread started")
+        self.socket.settimeout(1.0)  # Timeout to allow for stopping
+        
+        while self.running:
+            try:
+                # Accept new connection
                 try:
-                    self.client, address = self.socket.accept()
-                    self.client.setblocking(False)
+                    client, address = self.socket.accept()
                     print(f"Connected to client: {address}")
-                except BlockingIOError:
-                    pass  # No connection waiting
+                    
+                    # Handle client in a separate thread
+                    client_thread = threading.Thread(
+                        target=self._handle_client,
+                        args=(client,)
+                    )
+                    client_thread.daemon = True
+                    client_thread.start()
+                except socket.timeout:
+                    # Just check running condition
+                    continue
                 except Exception as e:
                     print(f"Error accepting connection: {str(e)}")
-                
-            # Process existing connection
-            if self.client:
+                    time.sleep(0.5)
+            except Exception as e:
+                print(f"Error in server loop: {str(e)}")
+                if not self.running:
+                    break
+                time.sleep(0.5)
+        
+        print("Server thread stopped")
+    
+    def _handle_client(self, client):
+        """Handle connected client"""
+        print("Client handler started")
+        client.settimeout(None)  # No timeout
+        buffer = b''
+        
+        try:
+            while self.running:
+                # Receive data
                 try:
-                    # Try to receive data
+                    data = client.recv(8192)
+                    if not data:
+                        print("Client disconnected")
+                        break
+                    
+                    buffer += data
                     try:
-                        data = self.client.recv(8192)
-                        if data:
-                            self.buffer += data
-                            # Try to process complete messages
+                        # Try to parse command
+                        command = json.loads(buffer.decode('utf-8'))
+                        buffer = b''
+                        
+                        # Execute command in Blender's main thread
+                        def execute_wrapper():
                             try:
-                                # Attempt to parse the buffer as JSON
-                                command = json.loads(self.buffer.decode('utf-8'))
-                                # If successful, clear the buffer and process command
-                                self.buffer = b''
                                 response = self.execute_command(command)
                                 response_json = json.dumps(response)
-                                self.client.sendall(response_json.encode('utf-8'))
-                            except json.JSONDecodeError:
-                                # Incomplete data, keep in buffer
-                                pass
-                        else:
-                            # Connection closed by client
-                            print("Client disconnected")
-                            self.client.close()
-                            self.client = None
-                            self.buffer = b''
-                    except BlockingIOError:
-                        pass  # No data available
-                    except Exception as e:
-                        print(f"Error receiving data: {str(e)}")
-                        self.client.close()
-                        self.client = None
-                        self.buffer = b''
+                                try:
+                                    client.sendall(response_json.encode('utf-8'))
+                                except:
+                                    print("Failed to send response - client disconnected")
+                            except Exception as e:
+                                print(f"Error executing command: {str(e)}")
+                                traceback.print_exc()
+                                try:
+                                    error_response = {
+                                        "status": "error",
+                                        "message": str(e)
+                                    }
+                                    client.sendall(json.dumps(error_response).encode('utf-8'))
+                                except:
+                                    pass
+                            return None
                         
+                        # Schedule execution in main thread
+                        bpy.app.timers.register(execute_wrapper, first_interval=0.0)
+                    except json.JSONDecodeError:
+                        # Incomplete data, wait for more
+                        pass
                 except Exception as e:
-                    print(f"Error with client: {str(e)}")
-                    if self.client:
-                        self.client.close()
-                        self.client = None
-                    self.buffer = b''
-                    
+                    print(f"Error receiving data: {str(e)}")
+                    break
         except Exception as e:
-            print(f"Server error: {str(e)}")
-            
-        return 0.1  # Continue timer with 0.1 second interval
+            print(f"Error in client handler: {str(e)}")
+        finally:
+            try:
+                client.close()
+            except:
+                pass
+            print("Client handler stopped")
 
     def execute_command(self, command):
         """Execute a command in the main Blender thread"""
@@ -140,7 +185,6 @@ class BlenderMCPServer:
                 
         except Exception as e:
             print(f"Error executing command: {str(e)}")
-
             traceback.print_exc()
             return {"status": "error", "message": str(e)}
 
