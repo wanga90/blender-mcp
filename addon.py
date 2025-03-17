@@ -21,6 +21,8 @@ bl_info = {
     "category": "Interface",
 }
 
+RODIN_FREE_TRIAL_KEY = "k9TcfFoEhNd9cCPP2guHAHHHkctZHIRhZDywZ1euGUXwihbYLpOjQhofby80NJez"
+
 class BlenderMCPServer:
     def __init__(self, host='localhost', port=9876):
         self.host = host
@@ -1291,7 +1293,8 @@ class BlenderMCPServer:
                                 4. Restart the connection to Claude"""
                 }
             mode = bpy.context.scene.blendermcp_hyper3d_mode
-            message = f"Hyper3D Rodin integration is enabled and ready to use. Mode: {mode}"
+            message = f"Hyper3D Rodin integration is enabled and ready to use. Mode: {mode}. " + \
+                f"Key type: {'private' if bpy.context.scene.blendermcp_hyper3d_api_key != RODIN_FREE_TRIAL_KEY else 'free_trial'}"
             return {
                 "enabled": True,
                 "message": message
@@ -1611,12 +1614,24 @@ class BLENDERMCP_PT_Panel(bpy.types.Panel):
         if scene.blendermcp_use_hyper3d:
             layout.prop(scene, "blendermcp_hyper3d_mode", text="Rodin Mode")
             layout.prop(scene, "blendermcp_hyper3d_api_key", text="API Key")
+            layout.operator("blendermcp.set_free_trial_api_key", text="Set Free Trial API Key")
         
         if not scene.blendermcp_server_running:
             layout.operator("blendermcp.start_server", text="Start MCP Server")
         else:
             layout.operator("blendermcp.stop_server", text="Stop MCP Server")
             layout.label(text=f"Running on port {scene.blendermcp_port}")
+
+# Operator to set Hyper3D API Key
+class BLENDERMCP_OT_SetFreeTrialHyper3DAPIKey(bpy.types.Operator):
+    bl_idname = "blendermcp.set_free_trial_api_key"
+    bl_label = "Set Free Trial API Key"
+    
+    def execute(self, context):
+        context.scene.blendermcp_hyper3d_api_key = RODIN_FREE_TRIAL_KEY
+        context.scene.blendermcp_hyper3d_mode = 'MAIN_SITE'
+        self.report({'INFO'}, "API Key set successfully!")
+        return {'FINISHED'}
 
 # Operator to start the server
 class BLENDERMCP_OT_StartServer(bpy.types.Operator):
@@ -1699,6 +1714,7 @@ def register():
     )
     
     bpy.utils.register_class(BLENDERMCP_PT_Panel)
+    bpy.utils.register_class(BLENDERMCP_OT_SetFreeTrialHyper3DAPIKey)
     bpy.utils.register_class(BLENDERMCP_OT_StartServer)
     bpy.utils.register_class(BLENDERMCP_OT_StopServer)
     
@@ -1711,6 +1727,7 @@ def unregister():
         del bpy.types.blendermcp_server
     
     bpy.utils.unregister_class(BLENDERMCP_PT_Panel)
+    bpy.utils.unregister_class(BLENDERMCP_OT_SetFreeTrialHyper3DAPIKey)
     bpy.utils.unregister_class(BLENDERMCP_OT_StartServer)
     bpy.utils.unregister_class(BLENDERMCP_OT_StopServer)
     
