@@ -12,12 +12,12 @@ import shutil
 from bpy.props import StringProperty, IntProperty, BoolProperty, EnumProperty
 
 bl_info = {
-    "name": "Blender MCP Fixed",
+    "name": "Blender MCP",
     "author": "BlenderMCP",
     "version": (0, 2),
     "blender": (3, 0, 0),
     "location": "View3D > Sidebar > BlenderMCP",
-    "description": "Connect Blender to Claude via MCP (Fixed Version)",
+    "description": "Connect Blender to Claude via MCP",
     "category": "Interface",
 }
 
@@ -688,7 +688,7 @@ class BlenderMCPServer:
                         env_tex.location = (-400, 0)
                         env_tex.image = bpy.data.images.load(tmp_path)
                         
-                        # FIXED: Use a color space that exists in all Blender versions
+                        # Use a color space that exists in all Blender versions
                         if file_format.lower() == 'exr':
                             # Try to use Linear color space for EXR files
                             try:
