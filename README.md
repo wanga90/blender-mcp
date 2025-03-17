@@ -5,6 +5,7 @@ BlenderMCP connects Blender to Claude AI through the Model Context Protocol (MCP
 ## Release notes (1.1.0)
 
 - Added support for Poly Haven assets through their API
+- Added support to prompt 3D models using Hyper3D Rodin
 - For newcomers, you can go straight to Installation. For existing users, see the points below
 - Download the latest addon.py file and replace the older one, then add it to Blender
 - Delete the MCP server from Claude and add it back again, and you should be good to go!
@@ -33,13 +34,17 @@ The system consists of two main components:
 - Python 3.10 or newer
 - uv package manager: 
 
-If you're on Mac, please install uv as
+**If you're on Mac, please install uv as**
 ```bash
 brew install uv
 ```
-On Windows
+**On Windows**
 ```bash
-pip install uv
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex" 
+```
+and then
+```bash
+set Path=C:\Users\nntra\.local\bin;%Path%
 ```
 
 Otherwise installation instructions are on their website: [Install uv](https://docs.astral.sh/uv/getting-started/installation/)
@@ -104,22 +109,15 @@ Once the config file has been set on Claude, and the addon is running on Blender
 
 ![BlenderMCP in the sidebar](assets/hammer-icon.png)
 
-#### Tools
+#### Capabilities
 
-- `get_scene_info` - Gets scene information
-- `get_object_info` - Gets detailed information for a specific object in the scene
-- `create_primitive` - Create basic primitive objects with optional color
-- `set_object_property` - Set a single property of an object
-- `create_object` - Create a new object with detailed parameters
-- `modify_object` - Modify an existing object's properties
-- `delete_object` - Remove an object from the scene
-- `set_material` - Apply or create materials for objects
-- `execute_blender_code` - Run any Python code in Blender
-- `get_polyhaven_categories` - Get a list of categories for PolyHaven assets (HDRIs, textures, models)
-- `search_polyhaven_assets` - Search for assets on PolyHaven with optional category filtering
-- `download_polyhaven_asset` - Download and import a PolyHaven asset into Blender
+- Get scene and object information 
+- Create, delete and modify shapes
+- Apply or create materials for objects
+- Execute any Python code in Blender
+- Download the right models, assets and HDRIs through [Poly Haven](https://polyhaven.com/)
+- AI generated 3D models through [Hyper3D Rodin](https://hyper3d.ai/)
 
-To see everything in Poly Haven, [see here](https://polyhaven.com/)
 
 ### Example Commands
 
@@ -128,6 +126,7 @@ Here are some examples of what you can ask Claude to do:
 - "Create a low poly scene in a dungeon, with a dragon guarding a pot of gold" [Demo](https://www.youtube.com/watch?v=DqgKuLYUv00)
 - "Create a beach vibe using HDRIs, textures, and models like rocks and vegetation from Poly Haven" [Demo](https://www.youtube.com/watch?v=I29rn92gkC4)
 - Give a reference image, and create a Blender scene out of it [Demo](https://www.youtube.com/watch?v=FDRb03XPiRo)
+- "Generate a 3D model of a garden gnome through Hyper3D"
 - "Get information about the current scene, and make a threejs sketch from it" [Demo](https://www.youtube.com/watch?v=jxbNI5L7AH8)
 - "Make this car red and metallic" 
 - "Create a sphere and place it above the cube"
