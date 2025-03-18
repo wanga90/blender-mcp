@@ -1709,6 +1709,7 @@ def register():
 
     bpy.types.Scene.blendermcp_hyper3d_api_key = bpy.props.StringProperty(
         name="Hyper3D API Key",
+        subtype="PASSWORD",
         description="API Key provided by Hyper3D",
         default=""
     )
