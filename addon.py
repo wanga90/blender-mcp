@@ -1614,7 +1614,7 @@ class BLENDERMCP_PT_Panel(bpy.types.Panel):
         if scene.blendermcp_use_hyper3d:
             layout.prop(scene, "blendermcp_hyper3d_mode", text="Rodin Mode")
             layout.prop(scene, "blendermcp_hyper3d_api_key", text="API Key")
-            layout.operator("blendermcp.set_free_trial_api_key", text="Set Free Trial API Key")
+            layout.operator("blendermcp.set_hyper3d_free_trial_api_key", text="Set Free Trial API Key")
         
         if not scene.blendermcp_server_running:
             layout.operator("blendermcp.start_server", text="Start MCP Server")
@@ -1624,7 +1624,7 @@ class BLENDERMCP_PT_Panel(bpy.types.Panel):
 
 # Operator to set Hyper3D API Key
 class BLENDERMCP_OT_SetFreeTrialHyper3DAPIKey(bpy.types.Operator):
-    bl_idname = "blendermcp.set_free_trial_api_key"
+    bl_idname = "blendermcp.set_hyper3d_free_trial_api_key"
     bl_label = "Set Free Trial API Key"
     
     def execute(self, context):
