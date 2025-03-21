@@ -6,6 +6,14 @@ BlenderMCP connects Blender to Claude AI through the Model Context Protocol (MCP
 
 Give feedback, get inspired, and build on top of the MCP: [Discord](https://discord.gg/xcJxvuW6)
 
+### Supporters
+
+**Top supporters:**
+[CodeRabbit](https://www.coderabbit.ai/)
+
+**All supporters:**
+[Support this project](https://github.com/sponsors/ahujasid)
+
 ## Release notes (1.1.0)
 
 - Added support for Poly Haven assets through their API
