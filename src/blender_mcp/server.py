@@ -691,7 +691,11 @@ def get_hyper3d_status(ctx: Context) -> str:
         logger.error(f"Error checking Hyper3D status: {str(e)}")
         return f"Error checking Hyper3D status: {str(e)}"
 
-def _process_bbox(original_bbox: list[float] | None) -> list[int] | None:
+def _process_bbox(original_bbox: list[float] | list[int] | None) -> list[int] | None:
+    if original_bbox is None:
+        return None
+    if all(isinstance(i, int) for i in original_bbox):
+        return original_bbox
     if any(i<=0 for i in original_bbox):
         raise ValueError("Incorrect number range: bbox must be bigger than zero!")
     return [int(float(i) / max(original_bbox) * 100) for i in original_bbox] if original_bbox else None
