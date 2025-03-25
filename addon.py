@@ -1415,6 +1415,9 @@ class BlenderMCPServer:
 
     @staticmethod
     def _clean_imported_glb(filepath, mesh_name=None):
+        # Get the set of existing objects before import
+        existing_objects = set(bpy.data.objects)
+
         # Import the GLB file
         bpy.ops.import_scene.gltf(filepath=filepath)
         
@@ -1422,7 +1425,8 @@ class BlenderMCPServer:
         bpy.context.view_layer.update()
         
         # Get all imported objects
-        imported_objects = [obj for obj in bpy.context.view_layer.objects if obj.select_get()]
+        imported_objects = list(set(bpy.data.objects) - existing_objects)
+        # imported_objects = [obj for obj in bpy.context.view_layer.objects if obj.select_get()]
         
         if not imported_objects:
             print("Error: No objects were imported.")
@@ -1457,10 +1461,15 @@ class BlenderMCPServer:
                 return
         
         # Rename the mesh if needed
-        if mesh_obj and mesh_name:
-            mesh_obj.name = mesh_name
-            print(f"Mesh renamed to: {mesh_name}")
-        
+        try:
+            if mesh_obj and mesh_obj.name is not None and mesh_name:
+                mesh_obj.name = mesh_name
+                if mesh_obj.data.name is not None:
+                    mesh_obj.data.name = mesh_name
+                print(f"Mesh renamed to: {mesh_name}")
+        except Exception as e:
+            print("Having issue with renaming, give up renaming.")
+
         return mesh_obj
 
     def import_generated_asset(self, *args, **kwargs):
