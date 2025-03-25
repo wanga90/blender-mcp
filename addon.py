@@ -1467,8 +1467,8 @@ class BlenderMCPServer:
                 if mesh_obj.data.name is not None:
                     mesh_obj.data.name = mesh_name
                 print(f"Mesh renamed to: {mesh_name}")
-        except:
-            pass
+        except Exception as e:
+            print("Having issue with renaming, give up renaming.")
 
         return mesh_obj
 

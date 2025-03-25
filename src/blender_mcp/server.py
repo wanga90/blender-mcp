@@ -11,7 +11,6 @@ import os
 from pathlib import Path
 import base64
 from urllib.parse import urlparse
-import math
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, 
