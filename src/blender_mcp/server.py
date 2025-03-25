@@ -692,6 +692,8 @@ def get_hyper3d_status(ctx: Context) -> str:
         return f"Error checking Hyper3D status: {str(e)}"
 
 def _process_bbox(original_bbox: list[float] | None) -> list[int] | None:
+    if any(i<=0 for i in original_bbox):
+        raise ValueError("Incorrect number range: bbox must be bigger than zero!")
     return [int(float(i) / max(original_bbox) * 100) for i in original_bbox] if original_bbox else None
 
 @mcp.tool()
@@ -729,7 +731,6 @@ def generate_hyper3d_model_via_text(
     except Exception as e:
         logger.error(f"Error generating Hyper3D task: {str(e)}")
         return f"Error generating Hyper3D task: {str(e)}"
-    return f"Placeholder, under development, not implemented yet."
 
 @mcp.tool()
 def generate_hyper3d_model_via_images(
