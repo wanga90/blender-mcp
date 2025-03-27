@@ -369,6 +369,10 @@ class BlenderMCPServer:
                 if obj.data:
                     obj.data.name = name
             
+            # Patch for PLANE: scale don't work with bpy.ops.mesh.primitive_plane_add()
+            if type in {"PLANE"}:
+                obj.scale = scale
+
             # Return the object info
             result = {
                 "name": obj.name,
