@@ -76,7 +76,7 @@ Go to Claude > Settings > Developer > Edit Config > claude_desktop_config.json t
 
 ```json
 {
-    "mcpServers": {
+    "mcpServers": { 
         "blender": {
             "command": "uvx",
             "args": [
